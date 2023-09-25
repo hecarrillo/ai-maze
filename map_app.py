@@ -88,19 +88,18 @@ class MapApp(wx.Frame):
                     self.current_position = (i, j)
                     # print current position
                     print("current position: ", self.current_position)
-                    self.unmask_surroundings(i, j)
+                    wx.CallLater(100, self.unmask_surroundings, i, j)
 
     def unmask_surroundings(self, i, j):
         directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         for dx, dy in directions:
             x, y = i + dx, j + dy
             if 0 <= x < len(self.map_data) and 0 <= y < len(self.map_data[0]):
-                print(x, y)
                 terrain, state = self.map_data[x][y]
                 self.buttons[x][y].SetBackgroundColour(self.get_terrain_color(terrain))
                 self.buttons[x][y].SetLabel(state)
-                self.Refresh()
-                self.Update()
+                self.buttons[x][y].Refresh()
+                self.buttons[x][y].Update()       
 
     def on_finish_editing(self, event):
         self.start_masking()
