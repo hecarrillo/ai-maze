@@ -8,6 +8,37 @@ TERRAINS = {
     "Forest": {"value": "4", "color": wx.Colour(0, 128, 0)}
 }
 
+CHARACTERS = {
+    "Human": {
+        "Mountain": 3,
+        "Land": 1,
+        "Water": 2,
+        "Sand": 2,
+        "Forest": 2
+    },
+    "Sasquatch": {
+        "Mountain": 1,
+        "Land": 1,
+        "Water": 1000,  # Sasquatch can't cross water
+        "Sand": 2,
+        "Forest": 1
+    },
+    "Monkey": {
+        "Mountain": 3,
+        "Land": 1,
+        "Water": 3,
+        "Sand": 2,
+        "Forest": 1
+    },
+    "Octopus": {
+        "Mountain": 1000,  # Octopus can't cross mountains
+        "Land": 3,
+        "Water": 1,
+        "Sand": 2,
+        "Forest": 3
+    }
+}
+
 MASK_COLOR = wx.Colour(0, 0, 0)  # Black color for masking
 
 class MapApp(wx.Frame):
@@ -36,10 +67,9 @@ class MapApp(wx.Frame):
             self.buttons.append(button_row)
 
         # Add the "Finish Editing and Start Playing" button at the bottom
-        self.finish_btn = wx.Button(panel, label="Finish Editing and Start Playing")
+        self.finish_btn = wx.Button(panel, label="Finish Editing")
         self.finish_btn.Bind(wx.EVT_BUTTON, self.on_finish_editing)
         grid.Add(self.finish_btn, 0, wx.EXPAND)
-
         panel.SetSizer(grid)
         self.Centre()
 
@@ -51,13 +81,23 @@ class MapApp(wx.Frame):
 
     def on_left_click(self, event, i, j):
         if self.masked:
-         # If the clicked cell is adjacent to the current position, move there and unmask surroundings
-            if abs(i - self.current_position[0]) + abs(j - self.current_position[1]) == 1:
-                self.map_data[i][j] = (self.map_data[i][j][0], 'V')
-                self.buttons[i][j].SetLabel('V')
-                self.current_position = (i, j)
-                self.unmask_surroundings(i, j)
-                self.Refresh()
+        # If the clicked cell is adjacent to the current position, move there and unmask surroundings
+            if abs(i - self.current_position[0]) + abs(j - self.current_position[1]) == 1 and self.map_data[i][j][1] not in ['I', 'V']:
+                terrain_value, _ = self.map_data[i][j]
+                terrain_name = [name for name, attributes in TERRAINS.items() if attributes["value"] == terrain_value][0]
+                move_cost = CHARACTERS[self.selected_character][terrain_name]
+                if move_cost < 1000:  # Ensure the character can move through the terrain
+                    self.total_cost += move_cost
+                    if self.map_data[i][j][1] == 'X':
+                        dlg = wx.MessageDialog(self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
+                        dlg.ShowModal()
+                        dlg.Destroy()
+                    else:
+                        self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+                        self.buttons[i][j].SetLabel('V')
+                        self.current_position = (i, j)
+                        self.unmask_surroundings(i, j)
+                        self.Refresh()
         else:
             current_terrain, current_state = self.map_data[i][j]
             dlg = wx.TextEntryDialog(self, 'Enter values separated by commas:', 'Edit Cell', current_state)
@@ -103,9 +143,15 @@ class MapApp(wx.Frame):
 
     def on_finish_editing(self, event):
         self.start_masking()
-        self.finish_btn.Disable()
         self.Refresh()
         self.Update()
+        dlg = wx.SingleChoiceDialog(self, 'Choose your character:', 'Character Selection', list(CHARACTERS.keys()))
+        if dlg.ShowModal() == wx.ID_OK:
+            self.selected_character = dlg.GetStringSelection()
+            self.total_cost = 0
+            self.finish_btn.Disable()
+        dlg.Destroy()
+        # wx.CallLater(100, self.start_masking)
 
 def read_map_from_file(filename):
     with open(filename, 'r') as file:
