@@ -126,8 +126,6 @@ class MapApp(wx.Frame):
                     self.buttons[i][j].SetLabel('')
                 else:
                     self.current_position = (i, j)
-                    # print current position
-                    print("current position: ", self.current_position)
                     wx.CallLater(100, self.unmask_surroundings, i, j)
 
     def unmask_surroundings(self, i, j):
@@ -151,7 +149,6 @@ class MapApp(wx.Frame):
             self.total_cost = 0
             self.finish_btn.Disable()
         dlg.Destroy()
-        # wx.CallLater(100, self.start_masking)
 
 def read_map_from_file(filename):
     with open(filename, 'r') as file:
