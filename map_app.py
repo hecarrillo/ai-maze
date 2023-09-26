@@ -88,6 +88,7 @@ class MapApp(wx.Frame):
                 move_cost = CHARACTERS[self.selected_character][terrain_name]
                 if move_cost < 1000:  # Ensure the character can move through the terrain
                     self.total_cost += move_cost
+                    self.path.append((i, j))
                     if self.map_data[i][j][1] == 'X':
                         dlg = wx.MessageDialog(self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
                         dlg.ShowModal()
@@ -126,6 +127,7 @@ class MapApp(wx.Frame):
                     self.buttons[i][j].SetLabel('')
                 else:
                     self.current_position = (i, j)
+                    self.path.append((i, j))
                     wx.CallLater(100, self.unmask_surroundings, i, j)
 
     def unmask_surroundings(self, i, j):
@@ -147,6 +149,7 @@ class MapApp(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             self.selected_character = dlg.GetStringSelection()
             self.total_cost = 0
+            self.path = []
             self.finish_btn.Disable()
         dlg.Destroy()
 
