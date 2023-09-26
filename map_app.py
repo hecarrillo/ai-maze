@@ -41,12 +41,19 @@ CHARACTERS = {
 
 MASK_COLOR = wx.Colour(0, 0, 0)  # Black color for masking
 
+CELL_STATES = {
+    "Initial Point": "I",
+    "Target": "X",
+    "Visited": "V"
+}
+
 class MapApp(wx.Frame):
     def __init__(self, map_data):
         super(MapApp, self).__init__(None, title="Map Editor", size=(800, 600))
         self.map_data = map_data
         self.initUI()
         self.masked = False
+        self.path = list()
 
     def initUI(self):
         panel = wx.Panel(self)
@@ -90,6 +97,7 @@ class MapApp(wx.Frame):
                     self.total_cost += move_cost
                     self.path.append((i, j))
                     if self.map_data[i][j][1] == 'X':
+                        print("Final path taken: ", self.path)
                         dlg = wx.MessageDialog(self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
                         dlg.ShowModal()
                         dlg.Destroy()
@@ -101,9 +109,9 @@ class MapApp(wx.Frame):
                         self.Refresh()
         else:
             current_terrain, current_state = self.map_data[i][j]
-            dlg = wx.TextEntryDialog(self, 'Enter values separated by commas:', 'Edit Cell', current_state)
+            dlg = wx.SingleChoiceDialog(self, 'Set the cell value:', 'Edit Cell', ["Initial Point", "Target"])
             if dlg.ShowModal() == wx.ID_OK:
-                new_state = dlg.GetValue()
+                new_state = CELL_STATES[dlg.GetStringSelection()]
                 self.map_data[i][j] = (current_terrain, new_state)
                 event.GetEventObject().SetLabel(new_state)
             dlg.Destroy()
