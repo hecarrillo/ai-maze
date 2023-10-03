@@ -54,6 +54,7 @@ class MapApp(wx.Frame):
         self.initUI()
         self.masked = False
         self.path = list()
+        self.decision_tree = {}
 
     def initUI(self):
         panel = wx.Panel(self)
@@ -85,6 +86,25 @@ class MapApp(wx.Frame):
             if attributes["value"] == terrain:
                 return attributes["color"]
         return wx.Colour(255, 255, 255)  # Default white color
+    
+    def check_if_decision(self, i, j):
+        # Check if the current cell is a decision point
+        #print("A decidir:", i, ",", j)
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        count_possible = 0
+        for dx, dy in directions:
+            x, y = i + dx, j + dy
+            if 0 <= x < len(self.map_data) and 0 <= y < len(self.map_data[0]):
+                terrain_value, state = self.map_data[x][y]
+                terrain_name = [name for name, attributes in TERRAINS.items() if attributes["value"] == terrain_value][0]
+                #print("x:",x,". y:",y," .s:", state, ". c:", CHARACTERS[self.selected_character][terrain_name], "p:", self.selected_character,". T:", terrain_name )
+                if "V" not in state and "O" not in state and "I" not in state:
+                    if(CHARACTERS[self.selected_character][terrain_name] < 1000):
+                        count_possible += 1
+        if count_possible > 1:
+            return True
+        else:
+            return False
 
     def on_left_click(self, event, i, j):
         if self.masked:
@@ -102,8 +122,12 @@ class MapApp(wx.Frame):
                         dlg.ShowModal()
                         dlg.Destroy()
                     else:
-                        self.map_data[i][j] = (self.map_data[i][j][0], 'V')
-                        self.buttons[i][j].SetLabel('V')
+                        if(self.check_if_decision(i,j)):
+                            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
+                            self.buttons[i][j].SetLabel('O')
+                        else:
+                            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+                            self.buttons[i][j].SetLabel('V')
                         self.current_position = (i, j)
                         self.unmask_surroundings(i, j)
                         self.Refresh()
