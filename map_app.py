@@ -53,6 +53,8 @@ class MapApp(wx.Frame):
         self.map_data = map_data
         self.initUI()
         self.masked = False
+        self.hasInitialPoint = False
+        self.hasFinalPoint = False
         self.path = list()
 
     def initUI(self):
