@@ -1,4 +1,7 @@
+from ast import Set
 import wx
+import networkx as nx
+import matplotlib.pyplot as plt
 
 TERRAINS = {
     "Mountain": {"value": "0", "color": wx.Colour(0, 255, 0)},
@@ -55,8 +58,7 @@ class MapApp(wx.Frame):
         self.masked = False
         self.hasInitialPoint = False
         self.hasFinalPoint = False
-        self.path = list()
-        self.decision_tree = {}
+        self.path = []
 
     def initUI(self):
         panel = wx.Panel(self)
@@ -80,6 +82,12 @@ class MapApp(wx.Frame):
         self.finish_btn = wx.Button(panel, label="Finish Editing")
         self.finish_btn.Bind(wx.EVT_BUTTON, self.on_finish_editing)
         grid.Add(self.finish_btn, 0, wx.EXPAND)
+
+        # Add the auto solve button
+        self.auto_solve_btn = wx.Button(panel, label="Auto Solve")
+        self.auto_solve_btn.Bind(wx.EVT_BUTTON, self.auto_solve)
+        grid.Add(self.auto_solve_btn, 10, wx.EXPAND); 
+
         panel.SetSizer(grid)
         self.Centre()
 
@@ -99,14 +107,17 @@ class MapApp(wx.Frame):
             if 0 <= x < len(self.map_data) and 0 <= y < len(self.map_data[0]):
                 terrain_value, state = self.map_data[x][y]
                 terrain_name = [name for name, attributes in TERRAINS.items() if attributes["value"] == terrain_value][0]
-                #print("x:",x,". y:",y," .s:", state, ". c:", CHARACTERS[self.selected_character][terrain_name], "p:", self.selected_character,". T:", terrain_name )
-                if "V" not in state and "O" not in state and "I" not in state:
-                    if(CHARACTERS[self.selected_character][terrain_name] < 1000):
-                        count_possible += 1
-        if count_possible > 1:
-            return True
-        else:
-            return False
+                if CHARACTERS[self.selected_character][terrain_name] < 1000 and ("V" not in state and "O" not in state and "I" not in state):
+                    count_possible += 1
+        return count_possible > 1
+    
+    def plot_decision_tree(self):
+        G = nx.DiGraph()
+        G.add_edges_from(self.tree_edges)
+
+        pos = nx.spring_layout(G)
+        nx.draw(G, pos, with_labels=True, node_size=500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40)
+        plt.show()
 
     def on_left_click(self, event, i, j):
         if self.masked:
@@ -164,18 +175,20 @@ class MapApp(wx.Frame):
                     self.path.append((i, j))
                     wx.CallLater(100, self.unmask_surroundings, i, j)
 
+    def is_valid_cell(self, i, j):
+        return 0 <= i < len(self.map_data) and 0 <= j < len(self.map_data[0])
     def unmask_surroundings(self, i, j):
         directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         for dx, dy in directions:
             x, y = i + dx, j + dy
-            if 0 <= x < len(self.map_data) and 0 <= y < len(self.map_data[0]):
+            if self.is_valid_cell (x, y):
                 terrain, state = self.map_data[x][y]
                 self.buttons[x][y].SetBackgroundColour(self.get_terrain_color(terrain))
                 self.buttons[x][y].SetLabel(state)
                 self.buttons[x][y].Refresh()
                 self.buttons[x][y].Update()       
 
-    def on_finish_editing(self, event):
+    def on_finish_editing(self):
         self.start_masking()
         self.Refresh()
         self.Update()
@@ -186,6 +199,65 @@ class MapApp(wx.Frame):
             self.path = []
             self.finish_btn.Disable()
         dlg.Destroy()
+
+    def auto_solve(self): 
+        #Prompt the user to select to solve either by DFS or BFS
+        dlg = wx.SingleChoiceDialog(self, 'Choose your algorithm:', 'Algorithm Selection', ["DFS", "BFS"])
+        if dlg.ShowModal() == wx.ID_OK:
+            self.selected_algorithm = dlg.GetStringSelection()
+            print(self, self.selected_algorithm)
+            self.solve(self, self.selected_algorithm)
+        dlg.Destroy()
+
+    def solve(self, algorithm):
+        #Solve the map using the selected algorithm
+        if algorithm == "DFS":
+            self.solve_dfs()
+        # elif algorithm == "BFS":
+        #     self.solve_bfs()
+
+    def get_cell_terrain(self, i, j):
+        terrain_value, _ = self.map_data[i][j]
+        return [
+            name
+            for name, attributes in TERRAINS.items()
+            if attributes["value"] == terrain_value
+        ][0]
+
+    def get_cell_cost(self, i, j):
+        terrain_name = self.get_cell_terrain(i, j)
+        return CHARACTERS[self.selected_character][terrain_name]
+    
+    def get_cell_value(self, i, j):
+        return self.map_data[i][j][0]
+
+    def solve_dfs(self):
+        self.visited = set()
+        self.tree_edges = []  # To store the edges of the decision tree
+        self.dfs(self.current_position[0], self.current_position[1])
+        self.plot_decision_tree()
+
+    def dfs(self, i, j):
+        if not self.is_valid_cell(i, j) or (i, j) in self.visited:
+            return False
+
+        if self.get_cell_value(i, j) == 'X':
+            return True
+
+        move_cost = self.get_cell_cost(i, j)
+        if move_cost >= 1000:  # Ensure the character can move through the terrain
+            return False
+
+        self.visited.add((i, j))
+
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        for dx, dy in directions:
+            x, y = i + dx, j + dy
+            if self.dfs(x, y):
+                self.tree_edges.append(((i, j), (x, y)))  # Add an edge to the decision tree
+                return True
+
+        return False
 
 def read_map_from_file(filename):
     with open(filename, 'r') as file:
