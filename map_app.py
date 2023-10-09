@@ -303,12 +303,23 @@ class MapApp(wx.Frame):
             self.solve(selected_algorithm)
         dlg.Destroy()
 
+    def unmask_map(self, map_data, buttons):
+        for i, row in enumerate(map_data):
+            for j, cell in enumerate(row):
+                terrain, state = cell
+                buttons[i][j].SetBackgroundColour(
+                    self.get_terrain_color(terrain))
+                buttons[i][j].SetLabel(state)
+                buttons[i][j].Refresh()
+                buttons[i][j].Update()
+
     def solve(self, algorithm):
         # Solve the map using the selected algorithm
         if algorithm == "DFS":
             self.solve_dfs()
         # elif algorithm == "BFS":
         #     self.solve_bfs()
+        self.unmask_map(self.map_data, self.buttons)
 
     def get_terrain_name(self, i, j):
         terrain_value, _ = self.map_data[i][j]
@@ -332,15 +343,22 @@ class MapApp(wx.Frame):
         self.dfs(self.current_position[0], self.current_position[1], None)
         self.plot_decision_tree()
 
+    def label_current_cell_as_visited(self, i, j):
+        if self.get_cell_value(i, j) in ('I', 'X'):
+            return
+        self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+
     def dfs(self, i, j, parent_node):
-        if self.get_cell_value(i, j) == 'X':
-            return True
+        self.label_current_cell_as_visited(i, j)
 
         current_node = TreeNode((i, j)) if parent_node else self.root
-
+        
         if parent_node:
             print('parent:', parent_node.value, 'current:', current_node.value)
             parent_node.add_child(current_node)
+        
+        if self.get_cell_value(i, j) == 'X':
+            return True
 
         self.visited.add((i, j))
 
