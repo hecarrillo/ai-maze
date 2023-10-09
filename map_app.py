@@ -12,6 +12,8 @@ TERRAINS = {
     "Forest": {"value": "4", "color": wx.Colour(0, 128, 0)}
 }
 
+DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+
 CHARACTERS = {
     "Human": {
         "Mountain": 3,
@@ -317,8 +319,8 @@ class MapApp(wx.Frame):
         # Solve the map using the selected algorithm
         if algorithm == "DFS":
             self.solve_dfs()
-        # elif algorithm == "BFS":
-        #     self.solve_bfs()
+        elif algorithm == "BFS":
+            self.solve_bfs()
         self.unmask_map(self.map_data, self.buttons)
 
     def get_terrain_name(self, i, j):
@@ -337,9 +339,7 @@ class MapApp(wx.Frame):
         return self.map_data[i][j][1]
 
     def solve_dfs(self):
-        self.visited = set()
-        print('initial position:', self.current_position)
-        self.root = TreeNode(self.current_position)
+        self.init_search_root()
         self.dfs(self.current_position[0], self.current_position[1], None)
         self.plot_decision_tree()
 
@@ -362,19 +362,47 @@ class MapApp(wx.Frame):
 
         self.visited.add((i, j))
 
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-
-        for dx, dy in directions:
+        for dx, dy in DIRECTIONS:
             x, y = i + dx, j + dy
-            if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
-                if self.dfs(x, y, current_node):
-                    return True
+            if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000 and self.dfs(x, y, current_node):
+                return True
 
         return False
+    
+    def solve_bfs(self):
+        self.init_search_root()
+        self.bfs()
+        self.plot_decision_tree()
+
+    # TODO Rename this here and in `solve_dfs` and `solve_bfs`
+    def init_search_root(self):
+        self.visited = set()
+        print('initial position:', self.current_position)
+        self.root = TreeNode(self.current_position)
+    
+    def bfs(self):
+        queue = [self.root]
+        while queue:
+            current_node = queue.pop(0)
+        
+            self.visited.add(current_node.value)
+            self.label_current_cell_as_visited(*current_node.value)
+
+            if self.get_cell_value(*current_node.value) == 'X':
+                return True
+            
+            for dx, dy in DIRECTIONS:
+                x, y = current_node.value[0] + dx, current_node.value[1] + dy
+                if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
+                    node = TreeNode((x, y))
+                    queue.append(node)
+                    current_node.add_child(node)
+                    self.visited.add((x, y))
 
 
-def read_map_from_file(filename):
-    with open(filename, 'r') as file:
+
+def read_map_from_file(self):
+    with open(self, 'r') as file:
         return [[(char, "") for char in line.strip()] for line in file.readlines()]
 
 
