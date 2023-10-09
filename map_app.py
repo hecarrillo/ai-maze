@@ -149,10 +149,11 @@ class MapApp(wx.Frame):
         self.finish_btn.Bind(wx.EVT_BUTTON, self.on_finish_editing)
         grid.Add(self.finish_btn, 0, wx.EXPAND)
 
-        # Add the auto solve button
+        # Add the auto solve button that is disabled until the user finishes editing
         self.auto_solve_btn = wx.Button(panel, label="Auto Solve")
         self.auto_solve_btn.Bind(wx.EVT_BUTTON, self.auto_solve)
         grid.Add(self.auto_solve_btn, 10, wx.EXPAND)
+        self.auto_solve_btn.Disable()
 
         panel.SetSizer(grid)
         self.Centre()
@@ -294,6 +295,7 @@ class MapApp(wx.Frame):
             self.path = []
             self.finish_btn.Disable()
         dlg.Destroy()
+        self.auto_solve_btn.Enable()
 
     def auto_solve(self, _):
         # Prompt the user to select to solve either by DFS or BFS
