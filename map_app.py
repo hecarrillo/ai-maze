@@ -13,6 +13,7 @@ TERRAINS = {
 }
 
 DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+DIRECTION_NAMES = ["Right", "Down", "Left", "Up"]
 
 CHARACTERS = {
     "Human": {
@@ -106,6 +107,9 @@ class TreeNode:
     def __init__(self, value):
         self.value = value
         self.children = []
+        self.actions = []
+        self.actionsExecuted = []
+        self.other = ""
 
     def add_child(self, child_node):
         self.children.append(child_node)
@@ -184,14 +188,15 @@ class MapApp(wx.Frame):
 
         def traverse_tree(node):
             for child in node.children:
-                G.add_edge(node.value, child.value)
+                G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (child.value, str(child.actions), str(child.actionsExecuted), str(child.other) ))
                 traverse_tree(child)
 
         traverse_tree(self.root)
 
-        pos = hierarchy_pos(G, self.root.value)
+        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other)))
         plt.figure(figsize=(10, 10))
-        nx.draw(G, pos=pos, with_labels=True, node_size=500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40)
+        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
+        nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
         plt.title("Decision Tree")
         plt.show()
 
@@ -345,30 +350,67 @@ class MapApp(wx.Frame):
         self.dfs(self.current_position[0], self.current_position[1], None)
         self.plot_decision_tree()
 
-    def label_current_cell_as_visited(self, i, j):
+    def label_current_cell_as_visited(self, i, j, node):
         if self.get_cell_value(i, j) in ('I', 'X'):
             return
-        self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+        if len(node.actions) > 1:
+            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
+        else:
+            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+
+    def direction_taken(self, i, j, parent_node):
+        #print('i:', i, 'j:', j, 'parent:', parent_node.value)
+        #print("value:", int(parent_node.value[0]), int(parent_node.value[1]), str(parent_node.value[2]))
+        if parent_node is None:
+            return 'I'
+        parent_i = int(parent_node.value[0])
+        parent_j = int(parent_node.value[1])
+        if i == parent_i and j == parent_j + 1:
+            return 'R'
+        elif i == parent_i + 1 and j == parent_j:
+            return 'D'
+        elif i == parent_i and j == parent_j - 1:
+            return 'L'
+        elif i == parent_i - 1 and j == parent_j:
+            return 'U'
+        return None
+    
+    def possible_move(self, i, j, x, y):
+        if x == i and y == j + 1:
+            return 'R'
+        elif x == i + 1 and y == j:
+            return 'D'
+        elif x == i and y == j - 1:
+            return 'L'
+        elif x == i - 1 and y == j:
+            return 'U'
+        return None
 
     def dfs(self, i, j, parent_node):
-        self.label_current_cell_as_visited(i, j)
-
-        current_node = TreeNode((i, j)) if parent_node else self.root
+        
+        current_node = TreeNode((i, j, self.direction_taken(i,j,parent_node) )) if parent_node else self.root
         
         if parent_node:
             print('parent:', parent_node.value, 'current:', current_node.value)
             parent_node.add_child(current_node)
         
         if self.get_cell_value(i, j) == 'X':
+            current_node.other = "Closed Path"
             return True
 
         self.visited.add((i, j))
 
         for dx, dy in DIRECTIONS:
             x, y = i + dx, j + dy
-            if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000 and self.dfs(x, y, current_node):
-                return True
-
+            if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
+                current_node.actions.append(self.possible_move(i,j,x,y))
+        self.label_current_cell_as_visited(i, j, current_node)
+        for dx, dy in DIRECTIONS:
+            x, y = i + dx, j + dy
+            if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
+                current_node.actionsExecuted.append(self.possible_move(i,j,x,y))
+                if self.dfs(x, y, current_node):
+                    return True
         return False
     
     def solve_bfs(self):
@@ -380,7 +422,8 @@ class MapApp(wx.Frame):
     def init_search_root(self):
         self.visited = set()
         print('initial position:', self.current_position)
-        self.root = TreeNode(self.current_position)
+        self.root = TreeNode((self.current_position[0], self.current_position[1], 'I'))
+        self.root.other = "Initial Point"
     
     def bfs(self):
         queue = [self.root]
