@@ -188,6 +188,30 @@ class MapApp(wx.Frame):
     def plot_decision_tree(self):
         G = nx.DiGraph()
 
+        def find_decision_maker(node):
+            if len(node.actions) > 1 or node.other == "Closed Path" or len(node.actions) == 0:
+                return node
+            for child in node.children:
+                return find_decision_maker(child)
+        def traverse_tree(node):
+            for child in node.children:
+                next = find_decision_maker(child)
+                if next is not None:
+                    G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (next.value, str(next.actions), str(next.actionsExecuted), str(next.other) ))
+                    traverse_tree(next)
+
+        traverse_tree(self.root)
+
+        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other)))
+        plt.figure(figsize=(10, 10))
+        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
+        nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
+        plt.title("Decision Tree, decision by decision")
+        plt.show()
+
+    def plot_step_tree(self):
+        G = nx.DiGraph()
+
         def traverse_tree(node):
             for child in node.children:
                 G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (child.value, str(child.actions), str(child.actionsExecuted), str(child.other) ))
@@ -199,7 +223,7 @@ class MapApp(wx.Frame):
         plt.figure(figsize=(10, 10))
         labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
         nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
-        plt.title("Decision Tree")
+        plt.title("Decision Tree step by step")
         plt.show()
 
     def on_left_click(self, event, i, j):
@@ -340,6 +364,18 @@ class MapApp(wx.Frame):
                 self.DIRECTIONS.append(DIRECTION_OF_LETTER[selected_letter])
             dlg.Destroy()
 
+    def select_plot_mode(self):
+        dlg = wx.SingleChoiceDialog(
+            self, 'Choose hot to display the decision tree:', 'tree display mode', ["Step by step", "Decision by decision"])
+        if dlg.ShowModal() == wx.ID_OK:
+            selected_mode = dlg.GetStringSelection()
+            print(selected_mode)
+            if selected_mode == "Decision by decision":
+                self.plot_decision_tree()
+            else:
+                self.plot_step_tree()
+        dlg.Destroy()        
+
     def solve(self, algorithm):
         # Solve the map using the selected algorithm
         self.DIRECTIONS = []
@@ -348,6 +384,7 @@ class MapApp(wx.Frame):
             self.solve_dfs()
         elif algorithm == "BFS":
             self.solve_bfs()
+        self.select_plot_mode()
         self.unmask_map(self.map_data, self.buttons)
 
     def get_terrain_name(self, i, j):
@@ -368,7 +405,6 @@ class MapApp(wx.Frame):
     def solve_dfs(self):
         self.init_search_root()
         self.dfs(self.current_position[0], self.current_position[1], None)
-        self.plot_decision_tree()
 
     def label_current_cell_as_visited(self, i, j, node):
         if self.get_cell_value(i, j) in ('I', 'X'):
@@ -446,7 +482,6 @@ class MapApp(wx.Frame):
         self.init_search_root()
         self.bfs()
         self.mark_bfs_executed(self.root)
-        self.plot_decision_tree()
 
     # TODO Rename this here and in `solve_dfs` and `solve_bfs`
     def init_search_root(self):
