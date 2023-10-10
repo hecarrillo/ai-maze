@@ -413,9 +413,19 @@ class MapApp(wx.Frame):
                     return True
         return False
     
+    def mark_bfs_executed(self, node):
+        if node is None:
+            return
+        visited = 0
+        for child in node.children:
+            if child is not None and self.map_data[child.value[0]][child.value[1]][1] == 'V' or self.map_data[child.value[0]][child.value[1]][1] == 'O':
+                node.actionsExecuted.append(child.value[2])
+            self.mark_bfs_executed(child)
+
     def solve_bfs(self):
         self.init_search_root()
         self.bfs()
+        self.mark_bfs_executed(self.root)
         self.plot_decision_tree()
 
     # TODO Rename this here and in `solve_dfs` and `solve_bfs`
@@ -430,16 +440,21 @@ class MapApp(wx.Frame):
         while queue:
             current_node = queue.pop(0)
         
-            self.visited.add(current_node.value)
-            self.label_current_cell_as_visited(*current_node.value)
-
-            if self.get_cell_value(*current_node.value) == 'X':
-                return True
+            self.visited.add((current_node.value[0], current_node.value[1]))
             
+
+            if self.get_cell_value(current_node.value[0], current_node.value[1] ) == 'X':
+                current_node.other = "Closed Path"
+                return True
             for dx, dy in DIRECTIONS:
                 x, y = current_node.value[0] + dx, current_node.value[1] + dy
                 if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
-                    node = TreeNode((x, y))
+                    current_node.actions.append(self.possible_move(current_node.value[0], current_node.value[1],x,y))
+            self.label_current_cell_as_visited(current_node.value[0], current_node.value[1], current_node)
+            for dx, dy in DIRECTIONS:
+                x, y = current_node.value[0] + dx, current_node.value[1] + dy
+                if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
+                    node = TreeNode((x, y, self.direction_taken(x,y,current_node)))
                     queue.append(node)
                     current_node.add_child(node)
                     self.visited.add((x, y))
