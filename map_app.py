@@ -13,7 +13,9 @@ TERRAINS = {
 }
 
 DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-DIRECTION_NAMES = ["Right", "Down", "Left", "Up"]
+DIRECTION_OF_LETTER = {'U':(-1,0), 'R':(0,1), 'D':(1,0), 'L':(0,-1) }
+
+
 
 CHARACTERS = {
     "Human": {
@@ -300,6 +302,7 @@ class MapApp(wx.Frame):
             self.path = []
             self.finish_btn.Disable()
         dlg.Destroy()
+
         self.auto_solve_btn.Enable()
 
     def auto_solve(self, _):
@@ -322,8 +325,25 @@ class MapApp(wx.Frame):
                 buttons[i][j].Refresh()
                 buttons[i][j].Update()
 
+    def select_direction_priority(self):
+        for i in range(4):
+            text = 'Choose direction #' + str(i+1)
+            available = []
+            for op in DIRECTION_OF_LETTER.keys():
+                if DIRECTION_OF_LETTER[op] not in self.DIRECTIONS:
+                    available.append(op)
+            dlg = wx.SingleChoiceDialog(
+                self, text, 'Direction Selection', available)
+            if dlg.ShowModal() == wx.ID_OK:
+                selected_letter = str(dlg.GetStringSelection())
+                print(selected_letter)
+                self.DIRECTIONS.append(DIRECTION_OF_LETTER[selected_letter])
+            dlg.Destroy()
+
     def solve(self, algorithm):
         # Solve the map using the selected algorithm
+        self.DIRECTIONS = []
+        self.select_direction_priority()
         if algorithm == "DFS":
             self.solve_dfs()
         elif algorithm == "BFS":
@@ -400,12 +420,12 @@ class MapApp(wx.Frame):
 
         self.visited.add((i, j))
 
-        for dx, dy in DIRECTIONS:
+        for dx, dy in self.DIRECTIONS:
             x, y = i + dx, j + dy
             if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
                 current_node.actions.append(self.possible_move(i,j,x,y))
         self.label_current_cell_as_visited(i, j, current_node)
-        for dx, dy in DIRECTIONS:
+        for dx, dy in self.DIRECTIONS:
             x, y = i + dx, j + dy
             if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
                 current_node.actionsExecuted.append(self.possible_move(i,j,x,y))
@@ -446,12 +466,12 @@ class MapApp(wx.Frame):
             if self.get_cell_value(current_node.value[0], current_node.value[1] ) == 'X':
                 current_node.other = "Closed Path"
                 return True
-            for dx, dy in DIRECTIONS:
+            for dx, dy in self.DIRECTIONS:
                 x, y = current_node.value[0] + dx, current_node.value[1] + dy
                 if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
                     current_node.actions.append(self.possible_move(current_node.value[0], current_node.value[1],x,y))
             self.label_current_cell_as_visited(current_node.value[0], current_node.value[1], current_node)
-            for dx, dy in DIRECTIONS:
+            for dx, dy in self.DIRECTIONS:
                 x, y = current_node.value[0] + dx, current_node.value[1] + dy
                 if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
                     node = TreeNode((x, y, self.direction_taken(x,y,current_node)))
