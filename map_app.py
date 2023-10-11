@@ -1,6 +1,5 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-import pydot
 from networkx.drawing.nx_pydot import graphviz_layout
 import wx
 
@@ -458,8 +457,6 @@ class MapApp(wx.Frame):
                     queue.append(node)
                     current_node.add_child(node)
                     self.visited.add((x, y))
-
-
 
 def read_map_from_file(self):
     with open(self, 'r') as file:
