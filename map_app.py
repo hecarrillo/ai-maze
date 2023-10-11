@@ -1,120 +1,11 @@
+import wx
 import networkx as nx
 import matplotlib.pyplot as plt
 from networkx.drawing.nx_pydot import graphviz_layout
-import wx
 
-TERRAINS = {
-    "Mountain": {"value": "0", "color": wx.Colour(0, 255, 0)},
-    "Land": {"value": "1", "color": wx.Colour(255, 165, 0)},
-    "Water": {"value": "2", "color": wx.Colour(0, 0, 255)},
-    "Sand": {"value": "3", "color": wx.Colour(255, 218, 185)},
-    "Forest": {"value": "4", "color": wx.Colour(0, 128, 0)}
-}
-
-DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-DIRECTION_OF_LETTER = {'U':(-1,0), 'R':(0,1), 'D':(1,0), 'L':(0,-1) }
-
-
-
-CHARACTERS = {
-    "Human": {
-        "Mountain": 3,
-        "Land": 1,
-        "Water": 2,
-        "Sand": 2,
-        "Forest": 2
-    },
-    "Sasquatch": {
-        "Mountain": 1,
-        "Land": 1,
-        "Water": 1000,  # Sasquatch can't cross water
-        "Sand": 2,
-        "Forest": 1
-    },
-    "Monkey": {
-        "Mountain": 3,
-        "Land": 1,
-        "Water": 3,
-        "Sand": 2,
-        "Forest": 1
-    },
-    "Octopus": {
-        "Mountain": 1000,  # Octopus can't cross mountains
-        "Land": 3,
-        "Water": 1,
-        "Sand": 2,
-        "Forest": 3
-    }
-}
-
-MASK_COLOR = wx.Colour(0, 0, 0)  # Black color for masking
-
-CELL_STATES = {
-    "Initial Point": "I",
-    "Target": "X",
-    "Visited": "V"
-}
-
-def hierarchy_pos(G, root=None, width=1., vert_gap=1, vert_loc=0, xcenter=0.5):
-    """
-    Compute the positions for nodes in a tree layout.
-
-    :param G: NetworkX graph or list of nodes
-    :param root: Root node for the tree layout
-    :param width: Horizontal space allocated for the whole tree
-    :param vert_gap: Gap between levels of the tree
-    :param vert_loc: Vertical location of the root
-    :param xcenter: Horizontal location of the root
-    :return: Dictionary of positions {node: (x, y)}
-    """
-
-    return _hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
-
-def _hierarchy_pos(G, root, width=1., vert_gap=1, vert_loc=0, xcenter=0.5, pos=None, parent=None, parsed=None):
-    """
-    Recursive function to compute the positions for nodes in a tree layout.
-
-    :param G: NetworkX graph or list of nodes
-    :param root: Root node for the tree layout
-    :param width: Horizontal space allocated for the whole tree
-    :param vert_gap: Gap between levels of the tree
-    :param vert_loc: Vertical location of the root
-    :param xcenter: Horizontal location of the root
-    :param pos: Current positions of nodes
-    :param parent: Parent node (used in recursion)
-    :param parsed: List of nodes that have been parsed (used in recursion)
-    :return: Dictionary of positions {node: (x, y)}
-    """
-
-    if parsed is None:
-        parsed = []
-    if pos is None:
-        pos = {root: (xcenter, vert_loc)}
-    else:
-        pos[root] = (xcenter, vert_loc)
-    children = list(G.neighbors(root))
-    if not isinstance(G, nx.DiGraph) and parent is not None:
-        children.remove(parent)
-    if children:
-        dx = width / len(children)
-        nextx = xcenter - width/2 - dx/2
-        for child in children:
-            nextx += dx
-            pos = _hierarchy_pos(G, child, width=dx, vert_gap=vert_gap, vert_loc=vert_loc-vert_gap, xcenter=nextx, pos=pos, parent=root, parsed=parsed)
-    return pos
-
-
-class TreeNode:
-    def __init__(self, value):
-        self.value = value
-        self.children = []
-        self.actions = []
-        self.actionsExecuted = []
-        self.other = ""
-
-    def add_child(self, child_node):
-        self.children.append(child_node)
-
+from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES
+from utils import hierarchy_pos, read_map_from_file
+from tree_node import TreeNode
 
 class MapApp(wx.Frame):
     def __init__(self, map_data):
@@ -512,11 +403,6 @@ class MapApp(wx.Frame):
                     queue.append(node)
                     current_node.add_child(node)
                     self.visited.add((x, y))
-
-def read_map_from_file(self):
-    with open(self, 'r') as file:
-        return [[(char, "") for char in line.strip()] for line in file.readlines()]
-
 
 if __name__ == '__main__':
     app = wx.App(False)
