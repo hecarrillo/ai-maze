@@ -17,6 +17,8 @@ class MapApp(wx.Frame):
         self.hasFinalPoint = False
         self.path = []
 
+    
+    """UI INITIALIZATION"""
     def initUI(self):
         panel = wx.Panel(self)
         # +1 for the finish button
@@ -54,12 +56,8 @@ class MapApp(wx.Frame):
         panel.SetSizer(grid)
         self.Centre()
 
-    def get_terrain_color(self, terrain):
-        for key, attributes in TERRAINS.items():
-            if attributes["value"] == terrain:
-                return attributes["color"]
-        return wx.Colour(255, 255, 255)  # Default white color
-
+    
+    """GENERIC UTILS"""
     def check_if_decision(self, i, j):
         # Check if the current cell is a decision point
         # print("A decidir:", i, ",", j)
@@ -75,6 +73,223 @@ class MapApp(wx.Frame):
                     count_possible += 1
         return count_possible > 1
 
+    """USER ACTIONS HANDLERS"""
+    def on_left_click(self, event, i, j):
+        if self.masked:
+            self.handle_masked_click(i, j)
+        else:
+            self.handle_unmasked_click(i, j, event)
+    def on_right_click(self, event, i, j):
+        dlg = wx.SingleChoiceDialog(
+            self, 'Choose terrain type:', 'Terrain Selection', list(TERRAINS.keys()))
+        if dlg.ShowModal() == wx.ID_OK:
+            selected_terrain = dlg.GetStringSelection()
+            self.map_data[i][j] = (
+                TERRAINS[selected_terrain]["value"], self.map_data[i][j][1])
+            event.GetEventObject().SetBackgroundColour(
+                TERRAINS[selected_terrain]["color"])
+            self.buttons[i][j].Refresh()
+        dlg.Destroy()
+    def on_finish_editing(self, _):
+        self.start_masking()
+        self.Refresh()
+        self.Update()
+        dlg = wx.SingleChoiceDialog(
+            self, 'Choose your character:', 'Character Selection', list(CHARACTERS.keys()))
+        if dlg.ShowModal() == wx.ID_OK:
+            self.selected_character = dlg.GetStringSelection()
+            self.total_cost = 0
+            self.path = []
+            self.finish_btn.Disable()
+        dlg.Destroy()
+
+        self.auto_solve_btn.Enable()
+    def solve(self, algorithm):
+        # Solve the map using the selected algorithm
+        self.DIRECTIONS = []
+        self.select_direction_priority()
+        if algorithm == "DFS":
+            self.solve_dfs()
+        elif algorithm == "BFS":
+            self.solve_bfs()
+        elif algorithm == "Iterative DFS":
+            self.solve_iterative_dfs()
+        elif algorithm == "A*":
+            self.solve_a_star()
+        self.select_plot_mode()
+        self.unmask_map(self.map_data, self.buttons)
+        self.highlight_path()
+
+    """USER ACTIONS UTILS"""
+    def handle_masked_click(self, i, j):
+        if abs(i - self.current_position[0]) + abs(j - self.current_position[1]) == 1 and self.map_data[i][j][1] not in ['I', 'V']:
+            terrain_value, _ = self.map_data[i][j]
+            terrain_name = [name for name, attributes in TERRAINS.items(
+            ) if attributes["value"] == terrain_value][0]
+            move_cost = CHARACTERS[self.selected_character][terrain_name]
+            if move_cost < 1000:  # Ensure the character can move through the terrain
+                self.total_cost += move_cost
+                self.path.append((i, j))
+                if self.map_data[i][j][1] == 'X':
+                    self.handle_game_over()
+                else:
+                    self.handle_valid_move(i, j)
+                    self.current_position = (i, j)
+                    self.unmask_surroundings(i, j)
+                    self.Refresh()
+    def handle_unmasked_click(self, i, j, event):
+        current_terrain, current_state = self.map_data[i][j]
+        dlg = wx.SingleChoiceDialog(self, 'Set the cell value:', 'Edit Cell', [
+                                    "Initial Point", "Target"])
+        if dlg.ShowModal() == wx.ID_OK:
+            new_state = CELL_STATES[dlg.GetStringSelection()]
+            self.map_data[i][j] = (current_terrain, new_state)
+            event.GetEventObject().SetLabel(new_state)
+        dlg.Destroy()
+
+    def handle_game_over(self):
+        print("Final path taken: ", self.path)
+        dlg = wx.MessageDialog(
+            self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def handle_valid_move(self, i, j):
+        if self.check_if_decision(i, j):
+            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
+            self.buttons[i][j].SetLabel('O')
+        else:
+            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+            self.buttons[i][j].SetLabel('V')
+    def select_direction_priority(self):
+        for i in range(4):
+            text = f'Choose direction #{str(i + 1)}'
+            available = [
+                op
+                for op in DIRECTION_OF_LETTER.keys()
+                if DIRECTION_OF_LETTER[op] not in self.DIRECTIONS
+            ]
+            dlg = wx.SingleChoiceDialog(
+                self, text, 'Direction Selection', available)
+            if dlg.ShowModal() == wx.ID_OK:
+                selected_letter = str(dlg.GetStringSelection())
+                print(selected_letter)
+                self.DIRECTIONS.append(DIRECTION_OF_LETTER[selected_letter])
+            dlg.Destroy()  
+    def auto_solve(self, _):
+        # Prompt the user to select to solve either by DFS or BFS
+        dlg = wx.SingleChoiceDialog(
+            self, 'Choose your algorithm:', 'Algorithm Selection', ["DFS", "BFS", "Iterative DFS", "A*"])
+        if dlg.ShowModal() == wx.ID_OK:
+            selected_algorithm = dlg.GetStringSelection()
+            print(selected_algorithm)
+            self.solve(selected_algorithm)
+        dlg.Destroy()
+    def start_masking(self):
+        self.masked = True
+        for i, row in enumerate(self.map_data):
+            for j, cell in enumerate(row):
+                _, state = cell
+                if state != 'I':
+                    self.buttons[i][j].SetBackgroundColour(MASK_COLOR)
+                    self.buttons[i][j].SetLabel('')
+                else:
+                    self.current_position = (i, j)
+                    self.path.append((i, j))
+                    wx.CallLater(100, self.unmask_surroundings, i, j)
+
+    """MAP VALUES UTILS"""
+    def get_terrain_name(self, i, j):
+        terrain_value, _ = self.map_data[i][j]
+        return [
+            name
+            for name, attributes in TERRAINS.items()
+            if attributes["value"] == terrain_value
+        ][0]
+    def get_cell_cost(self, i, j):
+        terrain_name = self.get_terrain_name(i, j)
+        return CHARACTERS[self.selected_character][terrain_name]
+    def get_cell_value(self, i, j):
+        return self.map_data[i][j][1]
+    def is_valid_cell(self, i, j):
+        return 0 <= i < len(self.map_data) and 0 <= j < len(self.map_data[0])
+    def get_terrain_color(self, terrain):
+        for _, attributes in TERRAINS.items():
+            if attributes["value"] == terrain:
+                return attributes["color"]
+        return wx.Colour(255, 255, 255)  # Default white color
+    
+    """MAP VISUALIZATION UTILS"""
+    def unmask_map(self, map_data, buttons):
+        for i, row in enumerate(map_data):
+            for j, cell in enumerate(row):
+                terrain, state = cell
+                buttons[i][j].SetBackgroundColour(
+                    self.get_terrain_color(terrain))
+                buttons[i][j].SetLabel(state)
+                buttons[i][j].Refresh()
+                buttons[i][j].Update()
+    def unmask_surroundings(self, i, j):
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        for dx, dy in directions:
+            x, y = i + dx, j + dy
+            if self.is_valid_cell(x, y):
+                terrain, state = self.map_data[x][y]
+                self.buttons[x][y].SetBackgroundColour(
+                    self.get_terrain_color(terrain))
+                self.buttons[x][y].SetLabel(state)
+                self.buttons[x][y].Refresh()
+                self.buttons[x][y].Update()
+    
+    """SEARCH ALGORITHMS INITIALIZATION"""
+    def init_search_root(self):
+        self.visited = set()
+        print('initial position:', self.current_position)
+        self.root = TreeNode((self.current_position[0], self.current_position[1], 'I'))
+        self.root.other = "Initial Point"
+    def solve_bfs(self):
+        self.init_search_root()
+        self.bfs()
+        self.append_actions_to_nodes(self.root)
+    def solve_dfs(self):
+        self.init_search_root()
+        self.dfs(self.current_position[0], self.current_position[1], None)
+    
+    def solve_iterative_dfs(self):
+        self.init_search_root()
+        self.iterative_dfs()
+        self.append_actions_to_nodes(self.root)
+    def solve_a_star(self):
+        self.init_search_root()
+        self.a_star()
+        self.append_actions_to_nodes(self.root)
+
+    """SEARCH ALGORITHM VISUALIZATION UTILS"""
+    def select_plot_mode(self):
+        dlg = wx.SingleChoiceDialog(
+            self, 'Choose hot to display the decision tree:', 'tree display mode', ["Step by step", "Decision by decision"])
+        if dlg.ShowModal() == wx.ID_OK:
+            selected_mode = dlg.GetStringSelection()
+            print(selected_mode)
+            if selected_mode == "Decision by decision":
+                self.plot_decision_tree()
+            else:
+                self.plot_step_tree()
+        dlg.Destroy() 
+    def highlight_path(self):
+        def traverse_tree(node):
+            if node.other == "Closed Path":
+                # change cell background color to red
+                self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                return True
+            else:
+                for child in node.children:
+                    if traverse_tree(child):
+                        # change cell background color to red
+                        self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                        return True
+                return False
+        traverse_tree(self.root)
     def plot_decision_tree(self):
         G = nx.DiGraph()
 
@@ -85,10 +300,10 @@ class MapApp(wx.Frame):
                 return find_decision_maker(child)
         def traverse_tree(node):
             for child in node.children:
-                next = find_decision_maker(child)
-                if next is not None:
-                    G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (next.value, str(next.actions), str(next.actionsExecuted), str(next.other) ))
-                    traverse_tree(next)
+                next_node = find_decision_maker(child)
+                if next_node is not None:
+                    G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (next_node.value, str(next_node.actions), str(next_node.actionsExecuted), str(next_node.other) ))
+                    traverse_tree(next_node)
 
         traverse_tree(self.root)
 
@@ -116,211 +331,8 @@ class MapApp(wx.Frame):
         plt.title("Decision Tree step by step")
         plt.show()
 
-    def on_left_click(self, event, i, j):
-        if self.masked:
-            self.handle_masked_click(i, j)
-        else:
-            self.handle_unmasked_click(i, j, event)
-
-    def handle_masked_click(self, i, j):
-        if abs(i - self.current_position[0]) + abs(j - self.current_position[1]) == 1 and self.map_data[i][j][1] not in ['I', 'V']:
-            terrain_value, _ = self.map_data[i][j]
-            terrain_name = [name for name, attributes in TERRAINS.items(
-            ) if attributes["value"] == terrain_value][0]
-            move_cost = CHARACTERS[self.selected_character][terrain_name]
-            if move_cost < 1000:  # Ensure the character can move through the terrain
-                self.total_cost += move_cost
-                self.path.append((i, j))
-                if self.map_data[i][j][1] == 'X':
-                    self.handle_game_over()
-                else:
-                    self.handle_valid_move(i, j)
-                    self.current_position = (i, j)
-                    self.unmask_surroundings(i, j)
-                    self.Refresh()
-
-    def handle_unmasked_click(self, i, j, event):
-        current_terrain, current_state = self.map_data[i][j]
-        dlg = wx.SingleChoiceDialog(self, 'Set the cell value:', 'Edit Cell', [
-                                    "Initial Point", "Target"])
-        if dlg.ShowModal() == wx.ID_OK:
-            new_state = CELL_STATES[dlg.GetStringSelection()]
-            self.map_data[i][j] = (current_terrain, new_state)
-            event.GetEventObject().SetLabel(new_state)
-        dlg.Destroy()
-
-    def handle_game_over(self):
-        print("Final path taken: ", self.path)
-        dlg = wx.MessageDialog(
-            self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    def handle_valid_move(self, i, j):
-        if self.check_if_decision(i, j):
-            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
-            self.buttons[i][j].SetLabel('O')
-        else:
-            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
-            self.buttons[i][j].SetLabel('V')
-
-    def on_right_click(self, event, i, j):
-        dlg = wx.SingleChoiceDialog(
-            self, 'Choose terrain type:', 'Terrain Selection', list(TERRAINS.keys()))
-        if dlg.ShowModal() == wx.ID_OK:
-            selected_terrain = dlg.GetStringSelection()
-            self.map_data[i][j] = (
-                TERRAINS[selected_terrain]["value"], self.map_data[i][j][1])
-            event.GetEventObject().SetBackgroundColour(
-                TERRAINS[selected_terrain]["color"])
-            self.buttons[i][j].Refresh()
-        dlg.Destroy()
-
-    def start_masking(self):
-        self.masked = True
-        for i, row in enumerate(self.map_data):
-            for j, cell in enumerate(row):
-                terrain, state = cell
-                if state != 'I':
-                    self.buttons[i][j].SetBackgroundColour(MASK_COLOR)
-                    self.buttons[i][j].SetLabel('')
-                else:
-                    self.current_position = (i, j)
-                    self.path.append((i, j))
-                    wx.CallLater(100, self.unmask_surroundings, i, j)
-
-    def is_valid_cell(self, i, j):
-        return 0 <= i < len(self.map_data) and 0 <= j < len(self.map_data[0])
-
-    def unmask_surroundings(self, i, j):
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        for dx, dy in directions:
-            x, y = i + dx, j + dy
-            if self.is_valid_cell(x, y):
-                terrain, state = self.map_data[x][y]
-                self.buttons[x][y].SetBackgroundColour(
-                    self.get_terrain_color(terrain))
-                self.buttons[x][y].SetLabel(state)
-                self.buttons[x][y].Refresh()
-                self.buttons[x][y].Update()
-
-    def on_finish_editing(self, _):
-        self.start_masking()
-        self.Refresh()
-        self.Update()
-        dlg = wx.SingleChoiceDialog(
-            self, 'Choose your character:', 'Character Selection', list(CHARACTERS.keys()))
-        if dlg.ShowModal() == wx.ID_OK:
-            self.selected_character = dlg.GetStringSelection()
-            self.total_cost = 0
-            self.path = []
-            self.finish_btn.Disable()
-        dlg.Destroy()
-
-        self.auto_solve_btn.Enable()
-
-    def auto_solve(self, _):
-        # Prompt the user to select to solve either by DFS or BFS
-        dlg = wx.SingleChoiceDialog(
-            self, 'Choose your algorithm:', 'Algorithm Selection', ["DFS", "BFS", "Iterative DFS"])
-        if dlg.ShowModal() == wx.ID_OK:
-            selected_algorithm = dlg.GetStringSelection()
-            print(selected_algorithm)
-            self.solve(selected_algorithm)
-        dlg.Destroy()
-
-    def unmask_map(self, map_data, buttons):
-        for i, row in enumerate(map_data):
-            for j, cell in enumerate(row):
-                terrain, state = cell
-                buttons[i][j].SetBackgroundColour(
-                    self.get_terrain_color(terrain))
-                buttons[i][j].SetLabel(state)
-                buttons[i][j].Refresh()
-                buttons[i][j].Update()
-
-    def select_direction_priority(self):
-        for i in range(4):
-            text = f'Choose direction #{str(i + 1)}'
-            available = [
-                op
-                for op in DIRECTION_OF_LETTER.keys()
-                if DIRECTION_OF_LETTER[op] not in self.DIRECTIONS
-            ]
-            dlg = wx.SingleChoiceDialog(
-                self, text, 'Direction Selection', available)
-            if dlg.ShowModal() == wx.ID_OK:
-                selected_letter = str(dlg.GetStringSelection())
-                print(selected_letter)
-                self.DIRECTIONS.append(DIRECTION_OF_LETTER[selected_letter])
-            dlg.Destroy()
-
-    def select_plot_mode(self):
-        dlg = wx.SingleChoiceDialog(
-            self, 'Choose hot to display the decision tree:', 'tree display mode', ["Step by step", "Decision by decision"])
-        if dlg.ShowModal() == wx.ID_OK:
-            selected_mode = dlg.GetStringSelection()
-            print(selected_mode)
-            if selected_mode == "Decision by decision":
-                self.plot_decision_tree()
-            else:
-                self.plot_step_tree()
-        dlg.Destroy()    
-
-    # iterates over the decision tree and highlights the path that takes you to the end ("Closed path")
-    def highlight_path(self):
-        def traverse_tree(node):
-            if node.other == "Closed Path":
-                # change cell background color to red
-                self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
-                return True
-            else:
-                for child in node.children:
-                    if traverse_tree(child):
-                        # change cell background color to red
-                        self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
-                        return True
-                return False
-        traverse_tree(self.root)
-
-    def solve(self, algorithm):
-        # Solve the map using the selected algorithm
-        self.DIRECTIONS = []
-        self.select_direction_priority()
-        if algorithm == "DFS":
-            self.solve_dfs()
-        elif algorithm == "BFS":
-            self.solve_bfs()
-        elif algorithm == "Iterative DFS":
-            self.solve_iterative_dfs()
-        self.select_plot_mode()
-        self.unmask_map(self.map_data, self.buttons)
-        self.highlight_path()
-
-    def get_terrain_name(self, i, j):
-        terrain_value, _ = self.map_data[i][j]
-        return [
-            name
-            for name, attributes in TERRAINS.items()
-            if attributes["value"] == terrain_value
-        ][0]
-
-    def get_cell_cost(self, i, j):
-        terrain_name = self.get_terrain_name(i, j)
-        return CHARACTERS[self.selected_character][terrain_name]
-
-    def get_cell_value(self, i, j):
-        return self.map_data[i][j][1]
-
-    def solve_dfs(self):
-        self.init_search_root()
-        self.dfs(self.current_position[0], self.current_position[1], None)
     
-    def solve_iterative_dfs(self):
-        self.init_search_root()
-        self.iterative_dfs()
-        self.append_actions_to_nodes(self.root)
-
+    """SEARCH ALGORITHMS UTILS"""
     def label_current_cell_as_visited(self, i, j, node):
         if self.get_cell_value(i, j) in ('I', 'X'):
             return
@@ -328,7 +340,6 @@ class MapApp(wx.Frame):
             self.map_data[i][j] = (self.map_data[i][j][0], 'O')
         else:
             self.map_data[i][j] = (self.map_data[i][j][0], 'V')
-
     def direction_taken(self, i, j, parent_node):
         if parent_node is None:
             return 'I'
@@ -343,7 +354,6 @@ class MapApp(wx.Frame):
         elif i == parent_i - 1 and j == parent_j:
             return 'U'
         return None
-    
     def possible_move(self, i, j, x, y):
         if x == i and y == j + 1:
             return 'R'
@@ -354,7 +364,37 @@ class MapApp(wx.Frame):
         elif x == i - 1 and y == j:
             return 'U'
         return None
+    def append_actions_to_nodes(self, node):
+        if node is None:
+            return
+        for child in node.children:
+            if child is not None and self.map_data[child.value[0]][child.value[1]][1] == 'V' or self.map_data[child.value[0]][child.value[1]][1] == 'O':
+                node.actionsExecuted.append(child.value[2])
+            self.append_actions_to_nodes(child)
+    
+    """ SEARCH ALGORITHMS IMPLEMENTATIONS """
+    def bfs(self):
+        queue = [self.root]
+        while queue:
+            current_node = queue.pop(0)
+            x, y = current_node.value[:2]
+            self.visited.add((x, y))
 
+            if self.get_cell_value(x, y) == 'X':
+                current_node.other = "Closed Path"
+                return True
+
+            for dx, dy in self.DIRECTIONS:
+                new_x, new_y = x + dx, y + dy
+                if self.is_valid_cell(new_x, new_y) and (new_x, new_y) not in self.visited and self.get_cell_cost(new_x, new_y) < 1000:
+                    action = self.possible_move(x, y, new_x, new_y)
+                    current_node.actions.append(action)
+                    node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
+                    queue.append(node)
+                    current_node.add_child(node)
+                    self.visited.add((new_x, new_y))
+
+            self.label_current_cell_as_visited(x, y, current_node)
     def dfs(self, i, j, parent_node):
         
         current_node = TreeNode((i, j, self.direction_taken(i,j,parent_node) )) if parent_node else self.root
@@ -381,50 +421,6 @@ class MapApp(wx.Frame):
                 if self.dfs(x, y, current_node):
                     return True
         return False
-    
-    def append_actions_to_nodes(self, node):
-        if node is None:
-            return
-        for child in node.children:
-            if child is not None and self.map_data[child.value[0]][child.value[1]][1] == 'V' or self.map_data[child.value[0]][child.value[1]][1] == 'O':
-                node.actionsExecuted.append(child.value[2])
-            self.append_actions_to_nodes(child)
-
-    def solve_bfs(self):
-        self.init_search_root()
-        self.bfs()
-        self.append_actions_to_nodes(self.root)
-
-    # TODO Rename this here and in `solve_dfs` and `solve_bfs`
-    def init_search_root(self):
-        self.visited = set()
-        print('initial position:', self.current_position)
-        self.root = TreeNode((self.current_position[0], self.current_position[1], 'I'))
-        self.root.other = "Initial Point"
-    
-    def bfs(self):
-        queue = [self.root]
-        while queue:
-            current_node = queue.pop(0)
-            x, y = current_node.value[:2]
-            self.visited.add((x, y))
-
-            if self.get_cell_value(x, y) == 'X':
-                current_node.other = "Closed Path"
-                return True
-
-            for dx, dy in self.DIRECTIONS:
-                new_x, new_y = x + dx, y + dy
-                if self.is_valid_cell(new_x, new_y) and (new_x, new_y) not in self.visited and self.get_cell_cost(new_x, new_y) < 1000:
-                    action = self.possible_move(x, y, new_x, new_y)
-                    current_node.actions.append(action)
-                    node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
-                    queue.append(node)
-                    current_node.add_child(node)
-                    self.visited.add((new_x, new_y))
-
-            self.label_current_cell_as_visited(x, y, current_node)
-
     def iterative_dfs(self):
         stack = [self.root]
         while stack:
