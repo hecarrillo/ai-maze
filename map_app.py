@@ -265,7 +265,23 @@ class MapApp(wx.Frame):
                 self.plot_decision_tree()
             else:
                 self.plot_step_tree()
-        dlg.Destroy()        
+        dlg.Destroy()    
+
+    # iterates over the decision tree and highlights the path that takes you to the end ("Closed path")
+    def highlight_path(self):
+        def traverse_tree(node):
+            if node.other == "Closed Path":
+                # change cell background color to red
+                self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                return True
+            else:
+                for child in node.children:
+                    if traverse_tree(child):
+                        # change cell background color to red
+                        self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                        return True
+                return False
+        traverse_tree(self.root)
 
     def solve(self, algorithm):
         # Solve the map using the selected algorithm
@@ -279,6 +295,7 @@ class MapApp(wx.Frame):
             self.solve_iterative_dfs()
         self.select_plot_mode()
         self.unmask_map(self.map_data, self.buttons)
+        self.highlight_path()
 
     def get_terrain_name(self, i, j):
         terrain_value, _ = self.map_data[i][j]

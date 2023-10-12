@@ -1,9 +1,9 @@
 import wx
 
 TERRAINS = {
-    "Mountain": {"value": "0", "color": wx.Colour(0, 255, 0)},
+    "Mountain": {"value": "2", "color": wx.Colour(0, 255, 0)},
     "Land": {"value": "1", "color": wx.Colour(255, 165, 0)},
-    "Water": {"value": "2", "color": wx.Colour(0, 0, 255)},
+    "Water": {"value": "0", "color": wx.Colour(0, 0, 255)},
     "Sand": {"value": "3", "color": wx.Colour(255, 218, 185)},
     "Forest": {"value": "4", "color": wx.Colour(0, 128, 0)}
 }
