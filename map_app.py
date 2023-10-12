@@ -222,7 +222,7 @@ class MapApp(wx.Frame):
     def auto_solve(self, _):
         # Prompt the user to select to solve either by DFS or BFS
         dlg = wx.SingleChoiceDialog(
-            self, 'Choose your algorithm:', 'Algorithm Selection', ["DFS", "BFS"])
+            self, 'Choose your algorithm:', 'Algorithm Selection', ["DFS", "BFS", "Iterative DFS"])
         if dlg.ShowModal() == wx.ID_OK:
             selected_algorithm = dlg.GetStringSelection()
             print(selected_algorithm)
@@ -241,11 +241,12 @@ class MapApp(wx.Frame):
 
     def select_direction_priority(self):
         for i in range(4):
-            text = 'Choose direction #' + str(i+1)
-            available = []
-            for op in DIRECTION_OF_LETTER.keys():
-                if DIRECTION_OF_LETTER[op] not in self.DIRECTIONS:
-                    available.append(op)
+            text = f'Choose direction #{str(i + 1)}'
+            available = [
+                op
+                for op in DIRECTION_OF_LETTER.keys()
+                if DIRECTION_OF_LETTER[op] not in self.DIRECTIONS
+            ]
             dlg = wx.SingleChoiceDialog(
                 self, text, 'Direction Selection', available)
             if dlg.ShowModal() == wx.ID_OK:
@@ -274,6 +275,8 @@ class MapApp(wx.Frame):
             self.solve_dfs()
         elif algorithm == "BFS":
             self.solve_bfs()
+        elif algorithm == "Iterative DFS":
+            self.solve_iterative_dfs()
         self.select_plot_mode()
         self.unmask_map(self.map_data, self.buttons)
 
@@ -295,6 +298,11 @@ class MapApp(wx.Frame):
     def solve_dfs(self):
         self.init_search_root()
         self.dfs(self.current_position[0], self.current_position[1], None)
+    
+    def solve_iterative_dfs(self):
+        self.init_search_root()
+        self.iterative_dfs()
+        self.append_actions_to_nodes(self.root)
 
     def label_current_cell_as_visited(self, i, j, node):
         if self.get_cell_value(i, j) in ('I', 'X'):
@@ -305,8 +313,6 @@ class MapApp(wx.Frame):
             self.map_data[i][j] = (self.map_data[i][j][0], 'V')
 
     def direction_taken(self, i, j, parent_node):
-        #print('i:', i, 'j:', j, 'parent:', parent_node.value)
-        #print("value:", int(parent_node.value[0]), int(parent_node.value[1]), str(parent_node.value[2]))
         if parent_node is None:
             return 'I'
         parent_i = int(parent_node.value[0])
@@ -359,19 +365,18 @@ class MapApp(wx.Frame):
                     return True
         return False
     
-    def mark_bfs_executed(self, node):
+    def append_actions_to_nodes(self, node):
         if node is None:
             return
-        visited = 0
         for child in node.children:
             if child is not None and self.map_data[child.value[0]][child.value[1]][1] == 'V' or self.map_data[child.value[0]][child.value[1]][1] == 'O':
                 node.actionsExecuted.append(child.value[2])
-            self.mark_bfs_executed(child)
+            self.append_actions_to_nodes(child)
 
     def solve_bfs(self):
         self.init_search_root()
         self.bfs()
-        self.mark_bfs_executed(self.root)
+        self.append_actions_to_nodes(self.root)
 
     # TODO Rename this here and in `solve_dfs` and `solve_bfs`
     def init_search_root(self):
@@ -384,25 +389,48 @@ class MapApp(wx.Frame):
         queue = [self.root]
         while queue:
             current_node = queue.pop(0)
-        
-            self.visited.add((current_node.value[0], current_node.value[1]))
-            
+            x, y = current_node.value[:2]
+            self.visited.add((x, y))
 
-            if self.get_cell_value(current_node.value[0], current_node.value[1] ) == 'X':
+            if self.get_cell_value(x, y) == 'X':
                 current_node.other = "Closed Path"
                 return True
+
             for dx, dy in self.DIRECTIONS:
-                x, y = current_node.value[0] + dx, current_node.value[1] + dy
-                if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
-                    current_node.actions.append(self.possible_move(current_node.value[0], current_node.value[1],x,y))
-            self.label_current_cell_as_visited(current_node.value[0], current_node.value[1], current_node)
-            for dx, dy in self.DIRECTIONS:
-                x, y = current_node.value[0] + dx, current_node.value[1] + dy
-                if self.is_valid_cell(x, y) and (x, y) not in self.visited and self.get_cell_cost(x, y) < 1000:
-                    node = TreeNode((x, y, self.direction_taken(x,y,current_node)))
+                new_x, new_y = x + dx, y + dy
+                if self.is_valid_cell(new_x, new_y) and (new_x, new_y) not in self.visited and self.get_cell_cost(new_x, new_y) < 1000:
+                    action = self.possible_move(x, y, new_x, new_y)
+                    current_node.actions.append(action)
+                    node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
                     queue.append(node)
                     current_node.add_child(node)
-                    self.visited.add((x, y))
+                    self.visited.add((new_x, new_y))
+
+            self.label_current_cell_as_visited(x, y, current_node)
+
+    def iterative_dfs(self):
+        stack = [self.root]
+        while stack:
+            current_node = stack.pop()
+            x, y = current_node.value[:2]
+            self.visited.add((x, y))
+
+            if self.get_cell_value(x, y) == 'X':
+                current_node.other = "Closed Path"
+                return True
+
+            for dx, dy in self.DIRECTIONS:
+                new_x, new_y = x + dx, y + dy
+                if self.is_valid_cell(new_x, new_y) and (new_x, new_y) not in self.visited and self.get_cell_cost(new_x, new_y) < 1000:
+                    action = self.possible_move(x, y, new_x, new_y)
+                    current_node.actions.append(action)
+                    node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
+                    stack.append(node)
+                    current_node.add_child(node)
+                    self.visited.add((new_x, new_y))
+
+            self.label_current_cell_as_visited(x, y, current_node)
+
 
 if __name__ == '__main__':
     app = wx.App(False)
