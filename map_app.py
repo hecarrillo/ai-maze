@@ -343,9 +343,11 @@ class MapApp(wx.Frame):
     def manhattan_distance_to_end(self, node):
         return (abs(node.value[0] - self.finalPoint[0]) + abs(node.value[1] - self.finalPoint[1]))
     def label_current_cell_as_visited(self, i, j, node):
-        if self.get_cell_value(i, j) in ('I', 'X'):
-            return
-        if len(node.actions) > 1:
+        if self.get_cell_value(i, j) == 'I':
+            self.map_data[i][j] = (self.map_data[i][j][0], f"I({node.total_cost})")
+        elif self.get_cell_value(i, j) == 'X':
+            self.map_data[i][j] = (self.map_data[i][j][0], f"X({node.total_cost})")
+        elif len(node.actions) > 1:
             self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.total_cost})")
         else:
             self.map_data[i][j] = (self.map_data[i][j][0], f"V({node.total_cost})")
@@ -453,6 +455,7 @@ class MapApp(wx.Frame):
 
             self.label_current_cell_as_visited(x, y, current_node)
     def a_star(self):
+        self.root.total_cost = self.manhattan_distance_to_end(self.root)
         queue = [(self.root.total_cost, self.root)]
         heapq.heapify(queue)
         while queue:
@@ -462,6 +465,7 @@ class MapApp(wx.Frame):
 
             if self.get_cell_value(x, y) == 'X':
                 current_node.other = "Closed Path"
+                self.label_current_cell_as_visited(x, y, current_node)
                 return True
 
             for dx, dy in self.DIRECTIONS:
