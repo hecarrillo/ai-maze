@@ -393,6 +393,7 @@ class MapApp(wx.Frame):
 
             if self.get_cell_value(x, y) == 'X':
                 current_node.other = "Closed Path"
+                self.label_current_cell_as_visited(x, y, current_node)
                 return True
 
             for dx, dy in self.DIRECTIONS:
@@ -401,6 +402,7 @@ class MapApp(wx.Frame):
                     action = self.possible_move(x, y, new_x, new_y)
                     current_node.actions.append(action)
                     node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
+                    node.total_cost = current_node.total_cost + self.get_cell_cost(new_x, new_y)
                     queue.append(node)
                     current_node.add_child(node)
                     self.visited.add((new_x, new_y))
@@ -409,6 +411,8 @@ class MapApp(wx.Frame):
     def dfs(self, i, j, parent_node):
         
         current_node = TreeNode((i, j, self.direction_taken(i,j,parent_node) )) if parent_node else self.root
+        if parent_node:
+            current_node.total_cost = parent_node.total_cost + self.get_cell_cost(i, j)
         
         if parent_node:
             print('parent:', parent_node.value, 'current:', current_node.value)
@@ -416,6 +420,7 @@ class MapApp(wx.Frame):
         
         if self.get_cell_value(i, j) == 'X':
             current_node.other = "Closed Path"
+            self.label_current_cell_as_visited(x, y, current_node)
             return True
 
         self.visited.add((i, j))
@@ -441,6 +446,7 @@ class MapApp(wx.Frame):
 
             if self.get_cell_value(x, y) == 'X':
                 current_node.other = "Closed Path"
+                self.label_current_cell_as_visited(x, y, current_node)
                 return True
 
             for dx, dy in self.DIRECTIONS:
@@ -449,6 +455,7 @@ class MapApp(wx.Frame):
                     action = self.possible_move(x, y, new_x, new_y)
                     current_node.actions.append(action)
                     node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
+                    node.total_cost = current_node.total_cost + self.get_cell_cost(new_x, new_y)
                     stack.append(node)
                     current_node.add_child(node)
                     self.visited.add((new_x, new_y))
