@@ -1,6 +1,7 @@
 import wx
 import networkx as nx
 import matplotlib.pyplot as plt
+import heapq
 from networkx.drawing.nx_pydot import graphviz_layout
 
 from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES
@@ -15,6 +16,8 @@ class MapApp(wx.Frame):
         self.masked = False
         self.hasInitialPoint = False
         self.hasFinalPoint = False
+        self.initialPoint = (0, 0)
+        self.finalPoint = (0, 0)
         self.path = []
 
     
@@ -145,6 +148,10 @@ class MapApp(wx.Frame):
             new_state = CELL_STATES[dlg.GetStringSelection()]
             self.map_data[i][j] = (current_terrain, new_state)
             event.GetEventObject().SetLabel(new_state)
+            if dlg.GetStringSelection == "Initial Point":
+                self.initialPoint = (i, j)
+            elif dlg.GetStringSelection == "Target":
+                self.finalPoint = (i, j)
         dlg.Destroy()
 
     def handle_game_over(self):
@@ -333,13 +340,15 @@ class MapApp(wx.Frame):
 
     
     """SEARCH ALGORITHMS UTILS"""
+    def manhattan_distance_to_end(self, node):
+        return (abs(node.value[0] - self.finalPoint[0]) + abs(node.value[1] - self.finalPoint[1]))
     def label_current_cell_as_visited(self, i, j, node):
         if self.get_cell_value(i, j) in ('I', 'X'):
             return
         if len(node.actions) > 1:
-            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
+            self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.total_cost})")
         else:
-            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
+            self.map_data[i][j] = (self.map_data[i][j][0], f"V({node.total_cost})")
     def direction_taken(self, i, j, parent_node):
         if parent_node is None:
             return 'I'
@@ -441,6 +450,31 @@ class MapApp(wx.Frame):
                     stack.append(node)
                     current_node.add_child(node)
                     self.visited.add((new_x, new_y))
+
+            self.label_current_cell_as_visited(x, y, current_node)
+    def a_star(self):
+        queue = [(self.root.total_cost, self.root)]
+        heapq.heapify(queue)
+        while queue:
+            current_node = heapq.heappop(queue)[1]
+            x, y = current_node.value[:2]
+            self.visited.add((x, y))
+
+            if self.get_cell_value(x, y) == 'X':
+                current_node.other = "Closed Path"
+                return True
+
+            for dx, dy in self.DIRECTIONS:
+                new_x, new_y = x + dx, y + dy
+                if self.is_valid_cell(new_x, new_y) and (new_x, new_y) not in self.visited and self.get_cell_cost(new_x, new_y) < 1000:
+                    action = self.possible_move(x, y, new_x, new_y)
+                    current_node.actions.append(action)
+                    node = TreeNode((new_x, new_y, self.direction_taken(new_x, new_y, current_node)))
+                    node.cost = current_node.cost + self.get_cell_cost(new_x, new_y)
+                    node.total_cost = node.cost + self.manhattan_distance_to_end(node)
+                    heapq.heappush(queue, (node.total_cost, node))
+                    current_node.add_child(node)
+                    #self.visited.add((new_x, new_y))
 
             self.label_current_cell_as_visited(x, y, current_node)
 
