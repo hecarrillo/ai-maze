@@ -47,5 +47,10 @@ MASK_COLOR = wx.Colour(0, 0, 0)  # Black color for masking
 CELL_STATES = {
     "Initial Point": "I",
     "Target": "X",
-    "Visited": "V"
+    "Visited": "V",
+    "Human": "H",
+    "Octopus": "O",
+    "Dark Temple": "D",
+    "Portal Key": "K",
+    "Portal": "P"
 }

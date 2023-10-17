@@ -16,8 +16,13 @@ class MapApp(wx.Frame):
         self.masked = False
         self.hasInitialPoint = False
         self.hasFinalPoint = False
-        self.initialPoint = (0, 0)
-        self.finalPoint = (0, 0)
+        self.initialPoint = (-1, -1)
+        self.finalPoint = (-1, -1)
+        self.initialHuman = (-1, -1)
+        self.initialOctopus = (-1, -1)
+        self.portalKey = (-1, -1)
+        self.darkTemple = (-1, -1)
+        self.portal = (-1, -1)
         self.path = []
 
     
@@ -143,15 +148,39 @@ class MapApp(wx.Frame):
     def handle_unmasked_click(self, i, j, event):
         current_terrain, current_state = self.map_data[i][j]
         dlg = wx.SingleChoiceDialog(self, 'Set the cell value:', 'Edit Cell', [
-                                    "Initial Point", "Target"])
+                                    "Human", "Octopus", "Portal Key", "Dark Temple", "Portal"])
         if dlg.ShowModal() == wx.ID_OK:
             new_state = CELL_STATES[dlg.GetStringSelection()]
+            print(new_state)
+            if new_state == "H":
+                print(f"{i},{j}. {self.initialHuman}")
+                if self.is_valid_cell(self.initialHuman[0], self.initialHuman[1]):
+                    self.map_data[self.initialHuman[0]][self.initialHuman[1]] = (self.map_data[self.initialHuman[0]][self.initialHuman[1]][0], "")
+                    self.buttons[self.initialHuman[0]][self.initialHuman[1]].SetLabel("")
+                self.initialHuman = (i, j)
+            elif new_state == "O":
+                if self.is_valid_cell(self.initialOctopus[0], self.initialOctopus[1]):
+                    self.map_data[self.initialOctopus[0]][self.initialOctopus[1]] = (self.map_data[self.initialOctopus[0]][self.initialHuman[1]][0], "")
+                    self.buttons[self.initialOctopus[0]][self.initialOctopus[1]].SetLabel("")
+                self.initialOctopus = (i, j)
+            elif new_state == "K":
+                if self.is_valid_cell(self.portalKey[0], self.portalKey[1]):
+                    self.map_data[self.portalKey[0]][self.portalKey[1]] = (self.map_data[self.portalKey[0]][self.initialHuman[1]][0], "")
+                    self.buttons[self.portalKey[0]][self.portalKey[1]].SetLabel("")
+                self.portalKey = (i, j)
+            elif new_state == "D":
+                if self.is_valid_cell(self.darkTemple[0], self.darkTemple[1]):
+                    self.map_data[self.darkTemple[0]][self.darkTemple[1]] = (self.map_data[self.darkTemple[0]][self.initialHuman[1]][0], "")
+                    self.buttons[self.darkTemple[0]][self.darkTemple[1]].SetLabel("")
+                self.darkTemple = (i, j)
+            elif new_state == "P":
+                if self.is_valid_cell(self.portal[0], self.portal[1]):
+                    self.map_data[self.portal[0]][self.portal[1]] = (self.map_data[self.portal[0]][self.initialHuman[1]][0], "")
+                    self.buttons[self.portal[0]][self.portal[1]].SetLabel("")
+                self.portal = (i, j)
+                
             self.map_data[i][j] = (current_terrain, new_state)
             event.GetEventObject().SetLabel(new_state)
-            if dlg.GetStringSelection == "Initial Point":
-                self.initialPoint = (i, j)
-            elif dlg.GetStringSelection == "Target":
-                self.finalPoint = (i, j)
         dlg.Destroy()
 
     def handle_game_over(self):
