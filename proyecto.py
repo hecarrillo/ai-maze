@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import heapq
 from networkx.drawing.nx_pydot import graphviz_layout
 
-from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES
+from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES, OBJECTIVES
 from utils import hierarchy_pos, read_map_from_file
 from tree_node import TreeNode
 
@@ -23,7 +23,10 @@ class MapApp(wx.Frame):
         self.portalKey = (-1, -1)
         self.darkTemple = (-1, -1)
         self.portal = (-1, -1)
+        self.routes = []
+        self.rout_costs = []
         self.path = []
+
 
     
     """UI INITIALIZATION"""
@@ -173,15 +176,67 @@ class MapApp(wx.Frame):
         return wx.Colour(255, 255, 255)  # Default white color
     
     """SEARCH ALGORITHMS INITIALIZATION"""
-    def init_search_root(self):
+    def init_search_root(self, start):
         self.visited = set()
-        print('initial position:', self.current_position)
-        self.root = TreeNode((self.current_position[0], self.current_position[1], 'I'))
+        print('initial position:', start)
+        self.root = TreeNode((start[0], start[1], 'I'))
         self.root.other = "Initial Point"
     def solve_a_star(self):
-        self.init_search_root()
-        self.a_star()
-        self.append_actions_to_nodes(self.root)
+        self.do_possible_routes(0)
+        start = (-1,-1)
+        end = (-1, -1)
+        routes_human = []
+        for route in self.routes:
+            if route[0] == 'I':
+                start = self.initialHuman
+            elif route[0] == 'D':
+                start = self.darkTemple
+            elif route[0] == 'K':
+                start = self.portalKey
+            elif route[0] == 'P':
+                start = self.portal
+            if route[1] == 'I':
+                end = self.initialHuman
+            elif route[1] == 'D':
+                end = self.darkTemple
+            elif route[1] == 'K':
+                end = self.portalKey
+            elif route[1] == 'P':
+                end = self.portal
+            self.clear_visited_cells()
+            self.init_search_root(start)
+            self.finalPoint = end
+            cost = self.a_star(start, end, "Human")
+            routes_human.append((route,cost))
+            self.append_actions_to_nodes(self.root) 
+        routes_octopus = []
+        for route in self.routes:
+            if route[0] == 'I':
+                start = self.initialOctopus
+            elif route[0] == 'D':
+                start = self.darkTemple
+            elif route[0] == 'K':
+                start = self.portalKey
+            elif route[0] == 'P':
+                start = self.portal
+            if route[1] == 'I':
+                end = self.initialOctopus
+            elif route[1] == 'D':
+                end = self.darkTemple
+            elif route[1] == 'K':
+                end = self.portalKey
+            elif route[1] == 'P':
+                end = self.portal
+            self.clear_visited_cells()
+            self.init_search_root(start)
+            self.finalPoint = end
+            cost = self.a_star(start, end, "Octopus")
+            routes_octopus.append((route,cost))
+            self.append_actions_to_nodes(self.root)
+        self.rout_costs.append(routes_human)
+        self.rout_costs.append(routes_octopus) 
+        self.print_routes()
+        
 
     """SEARCH ALGORITHM VISUALIZATION UTILS"""
     def highlight_path(self):
@@ -218,15 +273,36 @@ class MapApp(wx.Frame):
 
     
     """SEARCH ALGORITHMS UTILS"""
+    def print_routes(self):
+        print("")
+        print("\t", end="")
+        for rout in self.routes:
+            print(f"{rout[0]}->{rout[1]}\t", end="")
+        print("")
+        char_name = 1
+        for character in self.rout_costs:
+            if char_name == 1:
+                print(f"H:", end='\t')
+                char_name = 2
+            else:
+                print(f"O:", end='\t')
+            for rout in character:
+                print(f"{rout[1]}", end="\t")
+            print("")
+    def clear_visited_cells(self):
+        for i, row in enumerate(self.map_data):
+            for j, cell in enumerate(row):
+                terrain, state = cell
+                if state == 'V' or state == 'C':
+                    self.map_data[i][j] = (terrain, '')
+                    self.buttons[i][j].SetLabel('')
     def manhattan_distance_to_end(self, node):
         return (abs(node.value[0] - self.finalPoint[0]) + abs(node.value[1] - self.finalPoint[1]))
     def label_current_cell_as_visited(self, i, j, node):
-        if self.get_cell_value(i, j) == 'I':
-            self.map_data[i][j] = (self.map_data[i][j][0], f"I({node.total_cost})")
-        elif self.get_cell_value(i, j) == 'X':
-            self.map_data[i][j] = (self.map_data[i][j][0], f"X({node.total_cost})")
+        if self.get_cell_value(i, j) in "HODKP":
+            self.map_data[i][j] = (self.map_data[i][j][0], f"{self.get_cell_value(i, j)}({node.total_cost})")
         elif len(node.actions) > 1:
-            self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.total_cost})")
+            self.map_data[i][j] = (self.map_data[i][j][0], f"C({node.total_cost})")
         else:
             self.map_data[i][j] = (self.map_data[i][j][0], f"V({node.total_cost})")
     def direction_taken(self, i, j, parent_node):
@@ -262,8 +338,15 @@ class MapApp(wx.Frame):
             self.append_actions_to_nodes(child)
     
     """ SEARCH ALGORITHMS IMPLEMENTATIONS """
-    
-    def a_star(self):
+    def do_possible_routes(self, start):
+        for i in range(start+1, len(OBJECTIVES)):
+            self.routes.append((OBJECTIVES[start], OBJECTIVES[i], -1))
+            print(f"start: {OBJECTIVES[start]}, end: {OBJECTIVES[i]}")
+            self.do_possible_routes(i)
+
+    def a_star(self, start, end, character):
+        self.selected_character = character
+        self.current_position = start
         self.root.total_cost = self.manhattan_distance_to_end(self.root)
         queue = [(self.root.total_cost, self.root)]
         heapq.heapify(queue)
@@ -272,10 +355,10 @@ class MapApp(wx.Frame):
             x, y = current_node.value[:2]
             self.visited.add((x, y))
 
-            if self.get_cell_value(x, y) == 'X':
+            if current_node.value[:2] == end:
                 current_node.other = "Closed Path"
                 self.label_current_cell_as_visited(x, y, current_node)
-                return True
+                return current_node.cost
 
             for dx, dy in self.DIRECTIONS:
                 new_x, new_y = x + dx, y + dy
@@ -290,11 +373,11 @@ class MapApp(wx.Frame):
                     #self.visited.add((new_x, new_y))
 
             self.label_current_cell_as_visited(x, y, current_node)
-
+        return -1
 
 if __name__ == '__main__':
     app = wx.App(False)
-    map_data = read_map_from_file("map_data_field.txt")
+    map_data = read_map_from_file("map_data_proyecto.txt")
     frame = MapApp(map_data)
     frame.Show()
     app.MainLoop()

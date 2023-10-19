@@ -1,11 +1,11 @@
 import wx
 
 TERRAINS = {
-    "Mountain": {"value": "2", "color": wx.Colour(0, 255, 0)},
-    "Land": {"value": "1", "color": wx.Colour(255, 165, 0)},
-    "Water": {"value": "0", "color": wx.Colour(0, 0, 255)},
-    "Sand": {"value": "3", "color": wx.Colour(255, 218, 185)},
-    "Forest": {"value": "4", "color": wx.Colour(0, 128, 0)}
+    "Mountain": {"value": "1", "color": wx.Colour(50, 50, 50)},
+    "Land": {"value": "2", "color": wx.Colour(255, 218, 185)},
+    "Water": {"value": "3", "color": wx.Colour(0, 0, 255)},
+    "Sand": {"value": "4", "color": wx.Colour(255, 165, 0)},
+    "Forest": {"value": "5", "color": wx.Colour(0, 255, 0)}
 }
 
 DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
@@ -13,11 +13,11 @@ DIRECTION_OF_LETTER = {'U':(-1,0), 'R':(0,1), 'D':(1,0), 'L':(0,-1)}
 
 CHARACTERS = {
     "Human": {
-        "Mountain": 3,
+        "Mountain": 1000,
         "Land": 1,
         "Water": 2,
-        "Sand": 2,
-        "Forest": 2
+        "Sand": 3,
+        "Forest": 4
     },
     "Sasquatch": {
         "Mountain": 1,
@@ -35,9 +35,9 @@ CHARACTERS = {
     },
     "Octopus": {
         "Mountain": 1000,  # Octopus can't cross mountains
-        "Land": 3,
+        "Land": 4,
         "Water": 1,
-        "Sand": 2,
+        "Sand": 1000,
         "Forest": 3
     }
 }
@@ -54,3 +54,5 @@ CELL_STATES = {
     "Portal Key": "K",
     "Portal": "P"
 }
+
+OBJECTIVES = ("I", "D", "K", "P")
