@@ -242,23 +242,66 @@ class MapApp(wx.Frame):
         self.print_path_costs()
         self.assignation = self.calc_best_assignation()
         self.print_assignation()
+        self.highlight_path()
         
+    def give_position(self, character, letter):
+        position = (-1,-1)
+        if letter == 'I':
+            if character == "Human":
+                position = self.initialHuman
+            else:
+                position = self.initialOctopus
+        elif letter == 'D':
+            position = self.darkTemple
+        elif letter == 'K':
+            position = self.portalKey
+        elif letter == 'P':
+            position = self.portal
+        return position
 
     """SEARCH ALGORITHM VISUALIZATION UTILS"""
     def highlight_path(self):
+        human_path = self.assignation[0][0][0]
+        octopus_path = self.assignation[0][1][0]
+        for i in range(len(human_path)-1):
+            start = self.give_position("Human", human_path[i])
+            end = self.give_position("Human", human_path[i+1])
+            self.clear_visited_cells()
+            self.init_search_root(start)
+            self.finalPoint = end
+            cost = self.a_star(start, end, "Human")
+            if cost != -1:
+                self.paint_path("Human")
+        for i in range(len(octopus_path)-1):
+            start = self.give_position("Octopus", octopus_path[i])
+            end = self.give_position("Octopus", octopus_path[i+1])
+            self.clear_visited_cells()
+            self.init_search_root(start)
+            self.finalPoint = end
+            cost = self.a_star(start, end, "Octopus")
+            if cost != -1:
+                self.paint_path("Octopus")
+    def paint_path(self, character):
         def traverse_tree(node):
             if node.other == "Closed Path":
                 # change cell background color to red
-                self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                if character == "Human":
+                    self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                else:
+                    self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(150, 150, 0))
                 return True
             else:
                 for child in node.children:
                     if traverse_tree(child):
                         # change cell background color to red
-                        self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                        if character == "Human":
+                            self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                        else:
+                            self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(150, 150, 0))
                         return True
                 return False
         traverse_tree(self.root)
+
     
     def plot_step_tree(self):
         G = nx.DiGraph()
