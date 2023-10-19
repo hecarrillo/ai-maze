@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import heapq
 from networkx.drawing.nx_pydot import graphviz_layout
 
-from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES, OBJECTIVES
+from constants import TERRAINS, DIRECTIONS, DIRECTION_OF_LETTER, CHARACTERS, MASK_COLOR, CELL_STATES, OBJECTIVES, ROUTES
 from utils import hierarchy_pos, read_map_from_file
 from tree_node import TreeNode
 
@@ -24,7 +24,8 @@ class MapApp(wx.Frame):
         self.darkTemple = (-1, -1)
         self.portal = (-1, -1)
         self.routes = []
-        self.rout_costs = []
+        self.route_costs = []
+        self.path_costs = []
         self.path = []
 
 
@@ -233,9 +234,11 @@ class MapApp(wx.Frame):
             cost = self.a_star(start, end, "Octopus")
             routes_octopus.append((route,cost))
             self.append_actions_to_nodes(self.root)
-        self.rout_costs.append(routes_human)
-        self.rout_costs.append(routes_octopus) 
+        self.route_costs.append(routes_human)
+        self.route_costs.append(routes_octopus) 
         self.print_routes()
+        self.calc_path_costs()
+        self.print_path_costs()
         
 
     """SEARCH ALGORITHM VISUALIZATION UTILS"""
@@ -273,6 +276,27 @@ class MapApp(wx.Frame):
 
     
     """SEARCH ALGORITHMS UTILS"""
+    def print_path_costs(self):
+        print("\nHuman:")
+        for path in self.path_costs[0]:
+            print(f"\t{path[0]}: {path[1]}")
+        print("Octopus:")
+        for path in self.path_costs[1]:
+            print(f"\t{path[0]}: {path[1]}")
+    def calc_path_costs(self):
+        self.path_costs = [[],[]]
+        for c in range(2):
+            for path in ROUTES:
+                cost = 0
+                start = path[0]
+                for i in range(1, len(path)):
+                    end = path[i]
+                    for route in self.route_costs[c]:
+                        if route[0][0] == start and route[0][1] == end:
+                            cost += route[1]
+                            start = end
+                            break
+                self.path_costs[c].append((path,cost))
     def print_routes(self):
         print("")
         print("\t", end="")
@@ -280,7 +304,7 @@ class MapApp(wx.Frame):
             print(f"{rout[0]}->{rout[1]}\t", end="")
         print("")
         char_name = 1
-        for character in self.rout_costs:
+        for character in self.route_costs:
             if char_name == 1:
                 print(f"H:", end='\t')
                 char_name = 2

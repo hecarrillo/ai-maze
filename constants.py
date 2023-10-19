@@ -56,3 +56,4 @@ CELL_STATES = {
 }
 
 OBJECTIVES = ("I", "D", "K", "P")
+ROUTES = ("IP","IKP","IDP","IKDP","IDKP")
