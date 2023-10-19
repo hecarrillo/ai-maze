@@ -27,6 +27,7 @@ class MapApp(wx.Frame):
         self.route_costs = []
         self.path_costs = []
         self.path = []
+        self.assignation = []
 
 
     
@@ -239,6 +240,8 @@ class MapApp(wx.Frame):
         self.print_routes()
         self.calc_path_costs()
         self.print_path_costs()
+        self.assignation = self.calc_best_assignation()
+        self.print_assignation()
         
 
     """SEARCH ALGORITHM VISUALIZATION UTILS"""
@@ -276,6 +279,36 @@ class MapApp(wx.Frame):
 
     
     """SEARCH ALGORITHMS UTILS"""
+    def print_assignation(self):
+        print("\nBest Assignation:")
+        print(f"\tHuman: path {self.assignation[0][0][0]}. cost: {self.assignation[0][0][1]}")
+        print(f"\tOctopus: path {self.assignation[0][1][0]}. cost: {self.assignation[0][1][1]}")
+        print(f"\tTotal cost: {self.assignation[1]}")
+    def calc_best_assignation(self):
+        min_assignation = (None, 1000000)
+        for human_path in self.path_costs[0]:
+            for octopus_path in self.path_costs[1]:
+                if(human_path[1] == -1 or octopus_path[1] == -1):
+                    continue
+                total_cost = human_path[1] + octopus_path[1]
+                if total_cost < min_assignation[1]:
+                    completed = []
+                    for i in range(len(human_path[0])):
+                        if human_path[0][i] not in completed:
+                            completed.append(human_path[0][i])
+                    for i in range(len(octopus_path[0])):
+                        if octopus_path[0][i] not in completed:
+                            completed.append(octopus_path[0][i])
+                
+                    visited_all = True
+                    for point in "IKDP":
+                        if point not in completed:
+                            visited_all = False
+                            break
+                    if visited_all == True:
+                        min_assignation = ((human_path, octopus_path), total_cost)
+        return min_assignation
+                
     def print_path_costs(self):
         print("\nHuman:")
         for path in self.path_costs[0]:
