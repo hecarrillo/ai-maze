@@ -264,6 +264,7 @@ class MapApp(wx.Frame):
     def highlight_path(self):
         human_path = self.assignation[0][0][0]
         octopus_path = self.assignation[0][1][0]
+        acumulated_cost = 0
         for i in range(len(human_path)-1):
             start = self.give_position("Human", human_path[i])
             end = self.give_position("Human", human_path[i+1])
@@ -272,7 +273,8 @@ class MapApp(wx.Frame):
             self.finalPoint = end
             cost = self.a_star(start, end, "Human")
             if cost != -1:
-                self.paint_path("Human", i)
+                self.paint_path("Human", i, acumulated_cost)
+                acumulated_cost += cost
         for i in range(len(octopus_path)-1):
             start = self.give_position("Octopus", octopus_path[i])
             end = self.give_position("Octopus", octopus_path[i+1])
@@ -281,25 +283,26 @@ class MapApp(wx.Frame):
             self.finalPoint = end
             cost = self.a_star(start, end, "Octopus")
             if cost != -1:
-                self.paint_path("Octopus", i)
-    def paint_path(self, character, iteration):
+                self.paint_path("Octopus", i, acumulated_cost)
+                acumulated_cost += cost
+    def paint_path(self, character, iteration, acumulated_cost):
         queue = []
         def traverse_tree(node):
             if node.other == "Closed Path":
                 # change cell background color to red
                 if character == "Human":
-                    queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0)))
+                    queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0), "H", node.cost))
                 else:
-                    queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0)))
+                    queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0), "O", node.cost))
                 return True
             else:
                 for child in node.children:
                     if traverse_tree(child):
                         # change cell background color to red
                         if character == "Human":
-                            queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0)))
+                            queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0), "H", node.cost))
                         else:
-                            queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0)))                            
+                            queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0), "O", node.cost))                            
                         return True
                 return False
         def paint():
@@ -307,6 +310,7 @@ class MapApp(wx.Frame):
             for cell in queue:
                 self.buttons[cell[0]][cell[1]].SetBackgroundColour(cell[2])
                 self.buttons[cell[0]][cell[1]].Refresh()
+                self.buttons[cell[0]][cell[1]].SetLabel(f"{cell[3]}({cell[4]+acumulated_cost})")
                 self.Update()
                 sleep(0.4)
         traverse_tree(self.root)
