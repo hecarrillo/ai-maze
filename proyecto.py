@@ -66,27 +66,10 @@ class MapApp(wx.Frame):
 
     
     """GENERIC UTILS"""
-    def check_if_decision(self, i, j):
-        # Check if the current cell is a decision point
-        # print("A decidir:", i, ",", j)
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        count_possible = 0
-        for dx, dy in directions:
-            x, y = i + dx, j + dy
-            if 0 <= x < len(self.map_data) and 0 <= y < len(self.map_data[0]):
-                terrain_value, state = self.map_data[x][y]
-                terrain_name = [name for name, attributes in TERRAINS.items(
-                ) if attributes["value"] == terrain_value][0]
-                if CHARACTERS[self.selected_character][terrain_name] < 1000 and ("V" not in state and "O" not in state and "I" not in state):
-                    count_possible += 1
-        return count_possible > 1
 
     """USER ACTIONS HANDLERS"""
     def on_left_click(self, event, i, j):
-        if self.masked:
-            self.handle_masked_click(i, j)
-        else:
-            self.handle_unmasked_click(i, j, event)
+        self.handle_unmasked_click(i, j, event)
     def on_right_click(self, event, i, j):
         dlg = wx.SingleChoiceDialog(
             self, 'Choose terrain type:', 'Terrain Selection', list(TERRAINS.keys()))
@@ -143,21 +126,26 @@ class MapApp(wx.Frame):
         dlg.Destroy()
 
     def handle_game_over(self):
-        print("Final path taken: ", self.path)
         dlg = wx.MessageDialog(
-            self, f'You have reached the end of the game! Total cost: {self.total_cost}', 'Game Over', wx.OK)
+            self, f'You have reached the end of the game! Total cost: {self.assignation[1]}', 'Game Over', wx.OK)
         dlg.ShowModal()
         dlg.Destroy()
 
-    def handle_valid_move(self, i, j):
-        if self.check_if_decision(i, j):
-            self.map_data[i][j] = (self.map_data[i][j][0], 'O')
-            self.buttons[i][j].SetLabel('O')
-        else:
-            self.map_data[i][j] = (self.map_data[i][j][0], 'V')
-            self.buttons[i][j].SetLabel('V')  
-
     """MAP VALUES UTILS"""
+    def give_position(self, character, letter):
+        position = (-1,-1)
+        if letter == 'I':
+            if character == "Human":
+                position = self.initialHuman
+            else:
+                position = self.initialOctopus
+        elif letter == 'D':
+            position = self.darkTemple
+        elif letter == 'K':
+            position = self.portalKey
+        elif letter == 'P':
+            position = self.portal
+        return position
     def get_terrain_name(self, i, j):
         terrain_value, _ = self.map_data[i][j]
         return [
@@ -185,106 +173,46 @@ class MapApp(wx.Frame):
         self.root = TreeNode((start[0], start[1], 'I'))
         self.root.other = "Initial Point"
     def solve_a_star(self):
+        characters = ["Human", "Octopus"]
         self.do_possible_routes(0)
+        self.route_costs = [[],[]]
         start = (-1,-1)
         end = (-1, -1)
-        routes_human = []
-        for route in self.routes:
-            if route[0] == 'I':
-                start = self.initialHuman
-            elif route[0] == 'D':
-                start = self.darkTemple
-            elif route[0] == 'K':
-                start = self.portalKey
-            elif route[0] == 'P':
-                start = self.portal
-            if route[1] == 'I':
-                end = self.initialHuman
-            elif route[1] == 'D':
-                end = self.darkTemple
-            elif route[1] == 'K':
-                end = self.portalKey
-            elif route[1] == 'P':
-                end = self.portal
-            self.clear_visited_cells()
-            self.init_search_root(start)
-            self.finalPoint = end
-            cost = self.a_star(start, end, "Human")
-            routes_human.append((route,cost))
-            self.append_actions_to_nodes(self.root) 
-        routes_octopus = []
-        for route in self.routes:
-            if route[0] == 'I':
-                start = self.initialOctopus
-            elif route[0] == 'D':
-                start = self.darkTemple
-            elif route[0] == 'K':
-                start = self.portalKey
-            elif route[0] == 'P':
-                start = self.portal
-            if route[1] == 'I':
-                end = self.initialOctopus
-            elif route[1] == 'D':
-                end = self.darkTemple
-            elif route[1] == 'K':
-                end = self.portalKey
-            elif route[1] == 'P':
-                end = self.portal
-            self.clear_visited_cells()
-            self.init_search_root(start)
-            self.finalPoint = end
-            cost = self.a_star(start, end, "Octopus")
-            routes_octopus.append((route,cost))
-            self.append_actions_to_nodes(self.root)
-        self.route_costs.append(routes_human)
-        self.route_costs.append(routes_octopus) 
+        for i in range(len(characters)):
+            for route in self.routes:
+                start = self.give_position(characters[i], route[0])
+                end = self.give_position(characters[i], route[1])
+                self.clear_visited_cells()
+                self.init_search_root(start)
+                self.finalPoint = end
+                cost = self.a_star(start, end, characters[i])
+                self.route_costs[i].append((route,cost))
         self.print_routes()
         self.calc_path_costs()
         self.print_path_costs()
         self.assignation = self.calc_best_assignation()
         self.print_assignation()
         self.highlight_path()
-        
-    def give_position(self, character, letter):
-        position = (-1,-1)
-        if letter == 'I':
-            if character == "Human":
-                position = self.initialHuman
-            else:
-                position = self.initialOctopus
-        elif letter == 'D':
-            position = self.darkTemple
-        elif letter == 'K':
-            position = self.portalKey
-        elif letter == 'P':
-            position = self.portal
-        return position
+        self.handle_game_over()
 
     """SEARCH ALGORITHM VISUALIZATION UTILS"""
     def highlight_path(self):
+        characters = ["Human", "Octopus"]
         human_path = self.assignation[0][0][0]
         octopus_path = self.assignation[0][1][0]
+        paths = [human_path, octopus_path]
         acumulated_cost = 0
-        for i in range(len(human_path)-1):
-            start = self.give_position("Human", human_path[i])
-            end = self.give_position("Human", human_path[i+1])
-            self.clear_visited_cells()
-            self.init_search_root(start)
-            self.finalPoint = end
-            cost = self.a_star(start, end, "Human")
-            if cost != -1:
-                self.paint_path("Human", i, acumulated_cost)
-                acumulated_cost += cost
-        for i in range(len(octopus_path)-1):
-            start = self.give_position("Octopus", octopus_path[i])
-            end = self.give_position("Octopus", octopus_path[i+1])
-            self.clear_visited_cells()
-            self.init_search_root(start)
-            self.finalPoint = end
-            cost = self.a_star(start, end, "Octopus")
-            if cost != -1:
-                self.paint_path("Octopus", i, acumulated_cost)
-                acumulated_cost += cost
+        for c in range(len(characters)):
+            for i in range(len(paths[c])-1):
+                start = self.give_position(characters[c], paths[c][i])
+                end = self.give_position(characters[c], paths[c][i+1])
+                self.clear_visited_cells()
+                self.init_search_root(start)
+                self.finalPoint = end
+                cost = self.a_star(start, end, characters[c])
+                if cost != -1:
+                    self.paint_path(characters[c], i, acumulated_cost)
+                    acumulated_cost += cost
     def paint_path(self, character, iteration, acumulated_cost):
         queue = []
         def traverse_tree(node):
@@ -317,23 +245,6 @@ class MapApp(wx.Frame):
         paint()
 
     
-    def plot_step_tree(self):
-        G = nx.DiGraph()
-
-        def traverse_tree(node):
-            for child in node.children:
-                G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (child.value, str(child.actions), str(child.actionsExecuted), str(child.other) ))
-                traverse_tree(child)
-
-        traverse_tree(self.root)
-
-        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other)))
-        plt.figure(figsize=(10, 10))
-        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
-        nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
-        plt.title("Decision Tree step by step")
-        plt.show()
-
     
     """SEARCH ALGORITHMS UTILS"""
     def print_assignation(self):
@@ -356,7 +267,6 @@ class MapApp(wx.Frame):
                     for i in range(len(octopus_path[0])):
                         if octopus_path[0][i] not in completed:
                             completed.append(octopus_path[0][i])
-                
                     visited_all = True
                     for point in "IKDP":
                         if point not in completed:
@@ -419,13 +329,6 @@ class MapApp(wx.Frame):
                     self.buttons[i][j].SetLabel('')
     def manhattan_distance_to_end(self, node):
         return (abs(node.value[0] - self.finalPoint[0]) + abs(node.value[1] - self.finalPoint[1]))
-    def label_current_cell_as_visited(self, i, j, node):
-        if self.get_cell_value(i, j) in "HODKP":
-            self.map_data[i][j] = (self.map_data[i][j][0], f"{self.get_cell_value(i, j)}({node.total_cost})")
-        elif len(node.actions) > 1:
-            self.map_data[i][j] = (self.map_data[i][j][0], f"C({node.total_cost})")
-        else:
-            self.map_data[i][j] = (self.map_data[i][j][0], f"V({node.total_cost})")
     def direction_taken(self, i, j, parent_node):
         if parent_node is None:
             return 'I'
@@ -450,13 +353,6 @@ class MapApp(wx.Frame):
         elif x == i - 1 and y == j:
             return 'U'
         return None
-    def append_actions_to_nodes(self, node):
-        if node is None:
-            return
-        for child in node.children:
-            if child is not None and self.map_data[child.value[0]][child.value[1]][1] == 'V' or self.map_data[child.value[0]][child.value[1]][1] == 'O':
-                node.actionsExecuted.append(child.value[2])
-            self.append_actions_to_nodes(child)
     
     """ SEARCH ALGORITHMS IMPLEMENTATIONS """
     def do_possible_routes(self, start):
@@ -467,11 +363,6 @@ class MapApp(wx.Frame):
                     self.routes.append((OBJECTIVES[i], OBJECTIVES[j], -1))
                     print(f"start: {OBJECTIVES[i]}, end: {OBJECTIVES[j]}")
                     used.add((i,j))
-
-        #for i in range(start+1, len(OBJECTIVES)):
-        #    self.routes.append((OBJECTIVES[start], OBJECTIVES[i], -1))
-        #    print(f"start: {OBJECTIVES[start]}, end: {OBJECTIVES[i]}")
-        #    self.do_possible_routes(i)
 
     def a_star(self, start, end, character):
         self.selected_character = character
@@ -486,7 +377,6 @@ class MapApp(wx.Frame):
 
             if current_node.value[:2] == end:
                 current_node.other = "Closed Path"
-                self.label_current_cell_as_visited(x, y, current_node)
                 return current_node.cost
 
             for dx, dy in self.DIRECTIONS:
@@ -499,9 +389,6 @@ class MapApp(wx.Frame):
                     node.total_cost = node.cost + self.manhattan_distance_to_end(node)
                     heapq.heappush(queue, (node.total_cost, node))
                     current_node.add_child(node)
-                    #self.visited.add((new_x, new_y))
-
-            self.label_current_cell_as_visited(x, y, current_node)
         return -1
 
 if __name__ == '__main__':
