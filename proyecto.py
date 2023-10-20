@@ -1,3 +1,4 @@
+from time import sleep
 import wx
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -271,7 +272,7 @@ class MapApp(wx.Frame):
             self.finalPoint = end
             cost = self.a_star(start, end, "Human")
             if cost != -1:
-                self.paint_path("Human")
+                self.paint_path("Human", i)
         for i in range(len(octopus_path)-1):
             start = self.give_position("Octopus", octopus_path[i])
             end = self.give_position("Octopus", octopus_path[i+1])
@@ -280,27 +281,36 @@ class MapApp(wx.Frame):
             self.finalPoint = end
             cost = self.a_star(start, end, "Octopus")
             if cost != -1:
-                self.paint_path("Octopus")
-    def paint_path(self, character):
+                self.paint_path("Octopus", i)
+    def paint_path(self, character, iteration):
+        queue = []
         def traverse_tree(node):
             if node.other == "Closed Path":
                 # change cell background color to red
                 if character == "Human":
-                    self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                    queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0)))
                 else:
-                    self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(150, 150, 0))
+                    queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0)))
                 return True
             else:
                 for child in node.children:
                     if traverse_tree(child):
                         # change cell background color to red
                         if character == "Human":
-                            self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(255, 0, 0))
+                            queue.append((node.value[0], node.value[1], wx.Colour((100+(50*iteration)), 0, 0)))
                         else:
-                            self.buttons[node.value[0]][node.value[1]].SetBackgroundColour(wx.Colour(150, 150, 0))
+                            queue.append((node.value[0], node.value[1], wx.Colour(50+(50*iteration), 50+(50*iteration), 0)))                            
                         return True
                 return False
+        def paint():
+            queue.reverse()
+            for cell in queue:
+                self.buttons[cell[0]][cell[1]].SetBackgroundColour(cell[2])
+                self.buttons[cell[0]][cell[1]].Refresh()
+                self.Update()
+                sleep(0.4)
         traverse_tree(self.root)
+        paint()
 
     
     def plot_step_tree(self):
@@ -369,9 +379,16 @@ class MapApp(wx.Frame):
                     end = path[i]
                     for route in self.route_costs[c]:
                         if route[0][0] == start and route[0][1] == end:
+                            if(route[1] == -1):
+                                cost = -1
+                                start = end
+                                break
                             cost += route[1]
                             start = end
                             break
+                    if cost == -1:
+                        break
+                   
                 self.path_costs[c].append((path,cost))
     def print_routes(self):
         print("")
@@ -439,10 +456,18 @@ class MapApp(wx.Frame):
     
     """ SEARCH ALGORITHMS IMPLEMENTATIONS """
     def do_possible_routes(self, start):
-        for i in range(start+1, len(OBJECTIVES)):
-            self.routes.append((OBJECTIVES[start], OBJECTIVES[i], -1))
-            print(f"start: {OBJECTIVES[start]}, end: {OBJECTIVES[i]}")
-            self.do_possible_routes(i)
+        used = set()
+        for i in range(len(OBJECTIVES)-1):
+            for j in range(1,len(OBJECTIVES)):
+                if i != j and (i,j) not in used:
+                    self.routes.append((OBJECTIVES[i], OBJECTIVES[j], -1))
+                    print(f"start: {OBJECTIVES[i]}, end: {OBJECTIVES[j]}")
+                    used.add((i,j))
+
+        #for i in range(start+1, len(OBJECTIVES)):
+        #    self.routes.append((OBJECTIVES[start], OBJECTIVES[i], -1))
+        #    print(f"start: {OBJECTIVES[start]}, end: {OBJECTIVES[i]}")
+        #    self.do_possible_routes(i)
 
     def a_star(self, start, end, character):
         self.selected_character = character
