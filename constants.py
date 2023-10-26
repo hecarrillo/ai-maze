@@ -27,10 +27,10 @@ CHARACTERS = {
         "Forest": 1
     },
     "Monkey": {
-        "Mountain": 3,
-        "Land": 1,
-        "Water": 3,
-        "Sand": 2,
+        "Mountain": 1000,
+        "Land": 2,
+        "Water": 4,
+        "Sand": 3,
         "Forest": 1
     },
     "Octopus": {

@@ -492,7 +492,7 @@ class MapApp(wx.Frame):
 
 if __name__ == '__main__':
     app = wx.App(False)
-    map_data = read_map_from_file("map_data.txt")
+    map_data = read_map_from_file("map_data_field.txt")
     frame = MapApp(map_data)
     frame.Show()
     app.MainLoop()
