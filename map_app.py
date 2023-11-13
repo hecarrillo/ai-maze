@@ -148,9 +148,9 @@ class MapApp(wx.Frame):
             new_state = CELL_STATES[dlg.GetStringSelection()]
             self.map_data[i][j] = (current_terrain, new_state)
             event.GetEventObject().SetLabel(new_state)
-            if dlg.GetStringSelection == "Initial Point":
+            if dlg.GetStringSelection() == "Initial Point":
                 self.initialPoint = (i, j)
-            elif dlg.GetStringSelection == "Target":
+            elif dlg.GetStringSelection() == "Target":
                 self.finalPoint = (i, j)
         dlg.Destroy()
 
@@ -252,6 +252,7 @@ class MapApp(wx.Frame):
     def init_search_root(self):
         self.visited = set()
         print('initial position:', self.current_position)
+        print(f"Final point:{self.finalPoint}" )
         self.root = TreeNode((self.current_position[0], self.current_position[1], 'I'))
         self.root.other = "Initial Point"
     def solve_bfs(self):
@@ -309,14 +310,14 @@ class MapApp(wx.Frame):
             for child in node.children:
                 next_node = find_decision_maker(child)
                 if next_node is not None:
-                    G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (next_node.value, str(next_node.actions), str(next_node.actionsExecuted), str(next_node.other) ))
+                    G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other), str(node.cost), str(node.total_cost)), (next_node.value, str(next_node.actions), str(next_node.actionsExecuted), str(next_node.other), str(node.cost), str(node.total_cost) ))
                     traverse_tree(next_node)
 
         traverse_tree(self.root)
 
-        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other)))
+        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other), str(self.root.cost), str(self.root.total_cost) ))
         plt.figure(figsize=(10, 10))
-        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
+        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}.\nCost:{node[4]}.\nH={node[5]}" for node in G.nodes()}
         nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
         plt.title("Decision Tree, decision by decision")
         plt.show()
@@ -326,14 +327,15 @@ class MapApp(wx.Frame):
 
         def traverse_tree(node):
             for child in node.children:
-                G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other)), (child.value, str(child.actions), str(child.actionsExecuted), str(child.other) ))
+                G.add_edge((node.value, str(node.actions), str(node.actionsExecuted), str(node.other), str(node.cost), str(node.total_cost)), (child.value, str(child.actions), str(child.actionsExecuted), str(child.other), str(child.cost), str(child
+                                                                                                                                                                                                                                                   .total_cost) ))
                 traverse_tree(child)
 
         traverse_tree(self.root)
 
-        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other)))
+        pos = hierarchy_pos(G, (self.root.value, str(self.root.actions), str(self.root.actionsExecuted), str(self.root.other), str(self.root.cost), str(self.root.total_cost) ))
         plt.figure(figsize=(10, 10))
-        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}" for node in G.nodes()}
+        labels = {node: f"Position: ({node[0][0]},{node[0][1]}), dirTaken:{node[0][2]}\nActions:{node[1]}\nActionsExecuted:{node[2]}\nOther:{node[3]}.\nCost:{node[4]}.\nH={node[5]}" for node in G.nodes()}
         nx.draw(G, pos=pos, with_labels=True, labels=labels, node_size=1500, node_color="skyblue", node_shape="s", alpha=0.5, linewidths=40, )
         plt.title("Decision Tree step by step")
         plt.show()
@@ -342,15 +344,29 @@ class MapApp(wx.Frame):
     """SEARCH ALGORITHMS UTILS"""
     def manhattan_distance_to_end(self, node):
         return (abs(node.value[0] - self.finalPoint[0]) + abs(node.value[1] - self.finalPoint[1]))
-    def label_current_cell_as_visited(self, i, j, node):
-        if self.get_cell_value(i, j) == 'I':
-            self.map_data[i][j] = (self.map_data[i][j][0], f"I({node.total_cost})")
-        elif self.get_cell_value(i, j) == 'X':
-            self.map_data[i][j] = (self.map_data[i][j][0], f"X({node.total_cost})")
-        elif len(node.actions) > 1:
-            self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.total_cost})")
+    def label_current_cell_as_visited(self, i, j, node, visited=True):
+        if(visited == True):
+            if self.get_cell_value(i, j) == 'I':
+                self.map_data[i][j] = (self.map_data[i][j][0], f"I({node.cost},{node.total_cost})")
+            elif self.get_cell_value(i, j) == 'X':
+                self.map_data[i][j] = (self.map_data[i][j][0], f"X({node.cost},{node.total_cost})")
+            elif len(node.actions) > 1:
+                self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.cost},{node.total_cost})")
+            else:
+                self.map_data[i][j] = (self.map_data[i][j][0], f"O({node.cost},{node.total_cost})")
         else:
-            self.map_data[i][j] = (self.map_data[i][j][0], f"V({node.total_cost})")
+            self.map_data[i][j] = (self.map_data[i][j][0], f"{node.cost},{node.total_cost}")
+    def label_not_closed(self, queue):
+        print("Not closed:")
+        while queue:
+            current_node = heapq.heappop(queue)[1]
+            x, y = current_node.value[:2]
+            if (x, y) in self.visited:
+                continue
+            self.visited.add((x, y))
+            print(f"nodo: {current_node.value}, cost: {current_node.cost}, distance:{self.manhattan_distance_to_end(current_node)}. H={self.manhattan_distance_to_end(current_node) + current_node.cost}")
+            self.label_current_cell_as_visited(x, y, current_node, visited=False)
+            
     def direction_taken(self, i, j, parent_node):
         if parent_node is None:
             return 'I'
@@ -468,11 +484,14 @@ class MapApp(wx.Frame):
         while queue:
             current_node = heapq.heappop(queue)[1]
             x, y = current_node.value[:2]
+            if (x, y) in self.visited:
+                continue
             self.visited.add((x, y))
-
+            print(f"nodo: {current_node.value}, cost: {current_node.cost}, distance:{self.manhattan_distance_to_end(current_node)}. H={self.manhattan_distance_to_end(current_node) + current_node.cost}")
             if self.get_cell_value(x, y) == 'X':
                 current_node.other = "Closed Path"
                 self.label_current_cell_as_visited(x, y, current_node)
+                self.label_not_closed(queue)
                 return True
 
             for dx, dy in self.DIRECTIONS:
@@ -488,6 +507,7 @@ class MapApp(wx.Frame):
                     #self.visited.add((new_x, new_y))
 
             self.label_current_cell_as_visited(x, y, current_node)
+        return False
 
 
 if __name__ == '__main__':
